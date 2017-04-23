@@ -27,10 +27,10 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
   defp deps do
     [
       {:commanded, path: "~/src/commanded", runtime: false},
-      {:docker, github: "bearice/elixir-docker", only: :test},
+      {:docker, github: "bearice/elixir-docker", tag: "03809fc594b9706c106fc28b7ef03c2dbde2fe93", only: :test},
       {:extreme, "~> 0.8"},
-      {:hackney, "~> 1.6.0", override: true},
-      {:httpoison, "~> 0.8.0", only: :test},
+      {:hackney, "~> 1.8.0", override: true},
+      {:httpoison, "~> 0.11.1"},
       {:mix_test_watch, "~> 0.2", only: :dev},
     ]
   end

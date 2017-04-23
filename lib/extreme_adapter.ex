@@ -210,10 +210,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     )
   end
 
-  defp read_forward(stream, start_version, count) do
-    execute_read!(stream, start_version, count, :forward)
-  end
-
   defp read_backward(stream, start_version, count) do
     execute_read!(stream, start_version, count, :backward)
   end
@@ -258,7 +254,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   def to_recorded_event(ev = %Extreme.Messages.EventRecord{}) do
-    event_id = UUID.binary_to_string!(ev.event_id)
     data = @serializer.deserialize(ev.data, [type: ev.event_type])
 
     {correlation_id, meta_data} =
@@ -269,7 +264,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
       end
 
     %RecordedEvent{
-      event_id: event_id,
+      event_number: ev.event_number + 1,
       stream_id: to_stream_id(ev),
       stream_version: ev.event_number + 1,
       correlation_id: correlation_id,
@@ -346,12 +341,12 @@ defmodule Commanded.EventStore.Adapters.Extreme do
       meta_data = add_correlation_id(event.metadata, event.correlation_id)
 
       ExMsg.NewEvent.new(
-        event_id: UUID.string_to_binary!(UUID.uuid4),
+        event_id: UUID.uuid4() |> UUID.string_to_binary!(),
         event_type: event.event_type,
         data_content_type: 0,
         metadata_content_type: 0,
         data: to_raw_event_data(event.data),
-        metadata: to_raw_event_data(meta_data)
+        metadata: to_raw_event_data(meta_data),
       )
     end)
 

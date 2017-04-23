@@ -4,9 +4,6 @@ defmodule Commanded.EventStore.Adapters.ExtremeSubscription do
   require Logger
 
   @server Commanded.ExtremeEventStore
-
-  alias Commanded.EventStore.Adapters.Extreme
-
   @max_buffer_size 1_000
 
   def start(stream, subscription_name, subscriber, start_from, opts \\ []) do
@@ -41,13 +38,9 @@ defmodule Commanded.EventStore.Adapters.ExtremeSubscription do
     GenServer.call(pid, :result)
   end
 
-  # call
-
   def handle_call(:result, _from, state) do
     {:reply, state.result, state}
   end
-
-  # info
 
   def handle_info({:ack, last_seen_stream_version}, %{inflight_events: inflight} = state) do
     inflight_updated = Enum.filter(inflight, &(&1.stream_version > last_seen_stream_version))
@@ -98,9 +91,9 @@ defmodule Commanded.EventStore.Adapters.ExtremeSubscription do
   defp subscribe(state) do
     from_event_number =
       case state.start_from do
-	:origin      -> 0
-	:current     -> nil
-	event_number -> event_number
+      	:origin -> 0
+      	:current -> nil
+      	event_number -> event_number
       end
 
     receiver = spawn_receiver()
@@ -108,8 +101,8 @@ defmodule Commanded.EventStore.Adapters.ExtremeSubscription do
 
     result =
       case from_event_number do
-	nil          -> Extreme.subscribe_to(@server, receiver, state.stream)
-	event_number -> Extreme.read_and_stay_subscribed(@server, receiver, state.stream, event_number)
+      	nil -> Extreme.subscribe_to(@server, receiver, state.stream)
+      	event_number -> Extreme.read_and_stay_subscribed(@server, receiver, state.stream, event_number)
       end
 
     case result do
@@ -121,16 +114,17 @@ defmodule Commanded.EventStore.Adapters.ExtremeSubscription do
   defp spawn_receiver do
     subscription = self()
 
-    Process.spawn fn ->
+    Process.spawn(fn ->
       receive_loop = fn(loop) ->
-	receive do
-	  {:on_event, event} -> send(subscription, {:on_event, event})
-	end
-	loop.(loop)
+      	receive do
+      	  {:on_event, event} -> send(subscription, {:on_event, event})
+      	end
+
+        loop.(loop)
       end
 
       receive_loop.(receive_loop)
-    end, []
+    end, [])
   end
 
   defp unsubscribe(state) do
@@ -143,13 +137,12 @@ defmodule Commanded.EventStore.Adapters.ExtremeSubscription do
   end
 
   defp add_event_to_buffer(state, ev) do
-    if(state.events_total < state.max_buffer_size) do
-      %{
-	state |
-	events_buffer: [ev | state.events_buffer],
-	last_rcvd_event_no: ev.event.event_number,
-	events_total: state.events_total + 1,
-	start_from: ev.event.event_number + 1,
+    if (state.events_total < state.max_buffer_size) do
+      %{state |
+      	events_buffer: [ev | state.events_buffer],
+      	last_rcvd_event_no: ev.event.event_number,
+      	events_total: state.events_total + 1,
+      	start_from: ev.event.event_number + 1,
       }
     else
       unsubscribe(state)
@@ -168,7 +161,7 @@ defmodule Commanded.EventStore.Adapters.ExtremeSubscription do
     |> Enum.reverse
     |> Enum.map(&ExtremeEventStore.to_recorded_event/1)
 
-    send(subscriber, {:events, inflight, self()})
+    send(subscriber, {:events, inflight})
 
     %{
       state |
