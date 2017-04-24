@@ -20,7 +20,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   alias Extreme.Messages, as: ExMsg
 
   @event_store Commanded.EventStore.Adapters.Extreme.EventStore
-  @stream_prefix Application.get_env(:commanded_extreme_adapter, :streams_prefix, "")
+  @stream_prefix Application.get_env(:commanded_extreme_adapter, :streams_prefix, nil)
 
   defmodule State do
     defstruct [
@@ -153,7 +153,11 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 	      {:reply, {:error, :subscription_already_exists}, state}
 
       false ->
-      	stream = "$ce-#{@stream_prefix}"
+      	stream = case @stream_prefix do
+          nil -> "$ce"
+          prefix -> "$ce-" <> prefix
+        end
+
       	{:ok, pid} = Subscription.start(stream, subscription_name, subscriber, start_from, opts)
 
         state = %State{state |
@@ -164,9 +168,16 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  defp snapshot_stream(source_uuid), do: "#{@stream_prefix}snapshot-#{source_uuid}"
+  defp prefix(suffix) do
+    case @stream_prefix do
+      nil -> suffix
+      stream_prefix -> stream_prefix <> "-" <> suffix
+    end
+  end
 
-  defp stream_name(stream), do: "#{@stream_prefix}-#{stream}"
+  defp snapshot_stream(source_uuid), do: prefix("snapshot-" <> source_uuid)
+
+  defp stream_name(stream), do: prefix(stream)
 
   defp normalize_start_version(start_version) do
     if (start_version > 0), do: start_version - 1, else: start_version
@@ -287,18 +298,16 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     }
   end
 
-  defp to_stream_id(ev = %Extreme.Messages.EventRecord{}) do
-    prefix_len =
-      if Atom.to_string(SnapshotData) == ev.event_type do
-	      String.length("#{@stream_prefix}")
-      else
-	      String.length("#{@stream_prefix}-")
-      end
+  defp to_stream_id(%Extreme.Messages.EventRecord{event_stream_id: event_stream_id}) do
+    prefix_len = case @stream_prefix do
+      nil -> 0
+      prefix -> String.length(prefix)
+    end
 
     String.slice(
-      ev.event_stream_id,
+      event_stream_id,
       prefix_len,
-      String.length(ev.event_stream_id)
+      String.length(event_stream_id)
     )
   end
 
