@@ -1,28 +1,27 @@
 defmodule Commanded.EventStore.Adapters.Extreme.ResetStorage do
+  @container_name "commanded-tests-eventstore"
+
   def execute do
-    Application.ensure_all_started(:extreme)
+    Application.stop(:commanded_extreme_adapter)
+    Application.stop(:extreme)
 
   	reset_extreme_storage()
 
-  	Application.stop(:extreme)
-  	Application.ensure_all_started(:extreme)
+  	Application.ensure_all_started(:commanded_extreme_adapter)
   end
 
   defp reset_extreme_storage do
-    server = %{
+    {:ok, conn} = Docker.start_link(%{
       baseUrl: "http://localhost:2375",
       ssl_options: [
       	{:certfile, 'docker.crt'},
       	{:keyfile, 'docker.key'},
-      ]
-    }
-    container_name = "commanded-tests-eventstore"
+      ],
+    })
 
-    {:ok, conn} = Docker.start_link server
-
-    Docker.Container.kill conn, container_name
-    Docker.Container.delete conn, container_name
-    Docker.Container.create conn, container_name, %{
+    Docker.Container.kill(conn, @container_name)
+    Docker.Container.delete(conn, @container_name)
+    Docker.Container.create(conn, @container_name, %{
       "Image": "eventstore/eventstore",
       "ExposedPorts": %{
       	"2113/tcp" => %{},
@@ -37,9 +36,9 @@ defmodule Commanded.EventStore.Adapters.Extreme.ResetStorage do
       	"EVENTSTORE_RUN_PROJECTIONS=All",
       	"EVENTSTORE_START_STANDARD_PROJECTIONS=True"
       ]
-    }
+    })
 
-    Docker.Container.start conn, container_name
+    Docker.Container.start(conn, @container_name)
 
     wait_eventstore_ready()
   end

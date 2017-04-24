@@ -18,6 +18,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
       extra_applications: [
         :logger,
       ],
+      mod: {Commanded.EventStore.Adapters.Extreme.Application, []},
     ]
   end
 

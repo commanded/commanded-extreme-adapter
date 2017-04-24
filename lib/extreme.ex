@@ -9,21 +9,22 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 
   use GenServer
   use Commanded.EventStore.Serializer
+  use Commanded.EventStore.TypeProvider
 
   alias Commanded.EventStore.{
     EventData,
     RecordedEvent,
     SnapshotData,
   }
-  alias Commanded.EventStore.Adapters.ExtremeSubscription
+  alias Commanded.EventStore.Adapters.Extreme.Subscription
   alias Extreme.Messages, as: ExMsg
 
-  @server Commanded.ExtremeEventStore
+  @event_store Commanded.EventStore.Adapters.Extreme.EventStore
   @stream_prefix Application.get_env(:commanded_extreme_adapter, :streams_prefix, "")
 
   def start_link do
     state = %{subscriptions: %{}}
-
+IO.puts "start_link Commanded.EventStore.Adapters.Extreme"
     GenServer.start_link(__MODULE__, state, [name: __MODULE__])
   end
 
@@ -115,7 +116,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   def delete_snapshot(source_uuid) do
     stream = snapshot_stream(source_uuid)
 
-    case Extreme.execute(@server, delete_stream_msg(stream, false)) do
+    case Extreme.execute(@event_store, delete_stream_msg(stream, false)) do
       {:ok, _} -> :ok
       err -> err
     end
@@ -124,7 +125,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   def delete_stream(source_uuid) do
     stream = stream_name(source_uuid)
 
-    case Extreme.execute(@server, delete_stream_msg(stream, false)) do
+    case Extreme.execute(@event_store, delete_stream_msg(stream, false)) do
       {:ok, _} -> :ok
       err -> err
     end
@@ -145,10 +146,10 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 
       false ->
       	stream = "$ce-#{@stream_prefix}"
-      	{:ok, pid} = ExtremeSubscription.start(stream, subscription_name, subscriber, start_from, opts)
+      	{:ok, pid} = Subscription.start(stream, subscription_name, subscriber, start_from, opts)
       	state = %{ state | subscriptions: Map.put(state.subscriptions, subscription_name, pid)}
 
-      	{:reply, ExtremeSubscription.result(pid), state}
+      	{:reply, Subscription.result(pid), state}
     end
   end
 
@@ -182,14 +183,14 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   defp to_event_data(snapshot = %SnapshotData{}) do
     %EventData {
       correlation_id: nil,
-      event_type: @serializer.to_event_name(SnapshotData),
+      event_type: @type_provider.to_string(snapshot),
       data: to_raw_event_data(snapshot),
       metadata: nil
     }
   end
 
   defp add_to_stream(stream, expected_version, events) do
-    case Extreme.execute(@server, write_events(stream, expected_version, events)) do
+    case Extreme.execute(@event_store, write_events(stream, expected_version, events)) do
       {:ok, response} ->
 	      {:ok, response.last_event_number + 1}
 
@@ -222,7 +223,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   defp execute_read(stream, start_version, count, direction, read_events \\ []) do
-    case Extreme.execute(@server, read_events(stream, start_version, count, direction)) do
+    case Extreme.execute(@event_store, read_events(stream, start_version, count, direction)) do
       {:ok, %ExMsg.ReadStreamEventsCompleted{is_end_of_stream: end_of_stream?, events: events} = result} ->
 	      read_events = read_events ++ events
 
