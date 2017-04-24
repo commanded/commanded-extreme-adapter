@@ -49,11 +49,11 @@ defmodule Commanded.EventStore.Adapters.Extreme.ResetStorage do
 
     case HTTPoison.get "http://localhost:2113/streams/somestream", headers, options do
       {:ok, %HTTPoison.Response{status_code: 404}} ->
-      	:timer.sleep(400)
+      	:timer.sleep(1_000)
       	:ok
 
       _ ->
-      	:timer.sleep(400)
+      	:timer.sleep(1_000)
       	wait_eventstore_ready()
     end
   end

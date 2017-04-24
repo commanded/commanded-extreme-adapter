@@ -22,10 +22,14 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   @event_store Commanded.EventStore.Adapters.Extreme.EventStore
   @stream_prefix Application.get_env(:commanded_extreme_adapter, :streams_prefix, "")
 
+  defmodule State do
+    defstruct [
+      subscriptions: %{},
+    ]
+  end
+
   def start_link do
-    state = %{subscriptions: %{}}
-IO.puts "start_link Commanded.EventStore.Adapters.Extreme"
-    GenServer.start_link(__MODULE__, state, [name: __MODULE__])
+    GenServer.start_link(__MODULE__, %State{}, name: __MODULE__)
   end
 
   @spec append_to_stream(String.t, non_neg_integer, list(EventData.t)) :: {:ok, stream_version :: non_neg_integer} | {:error, reason :: term}
@@ -53,8 +57,10 @@ IO.puts "start_link Commanded.EventStore.Adapters.Extreme"
       	      {:ok, events, end_of_stream?} ->
       		      acc = {next_version + length(events), end_of_stream?}
 
-      		   {events, acc}
-      	       {:error, :stream_not_found}=err -> {[err], {next_version, true}}
+      		      {events, acc}
+
+      	       {:error, :stream_not_found} = err ->
+                 {[err], {next_version, true}}
       	    end
       	end
       end,
@@ -131,23 +137,28 @@ IO.puts "start_link Commanded.EventStore.Adapters.Extreme"
     end
   end
 
-  def handle_call({:unsubscribe_all, subscription_name}, _from, state) do
-    {subscription_pid, subscriptions} = Map.pop(state.subscriptions, subscription_name)
+  def handle_call({:unsubscribe_all, subscription_name}, _from, %State{subscriptions: subscriptions} = state) do
+    {subscription_pid, subscriptions} = Map.pop(subscriptions, subscription_name)
 
     Process.exit(subscription_pid, :kill)
 
-    {:reply, :ok, %{state | subscriptions: subscriptions}}
+    state = %State{state | subscriptions: subscriptions}
+
+    {:reply, :ok, state}
   end
 
-  def handle_call({:subscribe_all, subscription_name, subscriber, start_from, opts}, _from, state) do
-    case subscriber == Map.get(state.subscriptions, subscription_name) do
+  def handle_call({:subscribe_all, subscription_name, subscriber, start_from, opts}, _from, %State{subscriptions: subscriptions} = state) do
+    case subscriber == Map.get(subscriptions, subscription_name) do
       true ->
 	      {:reply, {:error, :subscription_already_exists}, state}
 
       false ->
       	stream = "$ce-#{@stream_prefix}"
       	{:ok, pid} = Subscription.start(stream, subscription_name, subscriber, start_from, opts)
-      	state = %{ state | subscriptions: Map.put(state.subscriptions, subscription_name, pid)}
+
+        state = %State{state |
+          subscriptions: Map.put(subscriptions, subscription_name, pid),
+        }
 
       	{:reply, Subscription.result(pid), state}
     end
