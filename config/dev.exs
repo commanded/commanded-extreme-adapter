@@ -11,4 +11,4 @@ config :extreme, :event_store,
 
 config :commanded_extreme_adapter,
   serializer: Commanded.Serialization.JsonSerializer,
-  streams_prefix: "commanded-dev"
+  stream_prefix: "commandeddev"

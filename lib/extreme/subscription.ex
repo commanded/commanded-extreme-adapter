@@ -32,22 +32,14 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
       stream: stream,
       name: subscription_name,
       subscriber: subscriber,
-      subscriber_ref: nil,
       start_from: start_from,
-      result: nil,
-      receiver: nil,
-      receiver_ref: nil,
-      last_rcvd_event_no: nil,
-      events_buffer: [],
-      inflight_events: [],
-      events_total: 0,
       max_buffer_size: opts[:max_buffer_size] || @max_buffer_size
     })
   end
 
-  def init(%State{} = state) do
+  def init(%State{subscriber: subscriber} = state) do
     state = %State{state |
-      subscriber_ref: Process.monitor(state.subscriber),
+      subscriber_ref: Process.monitor(subscriber),
     }
 
     Logger.debug(fn -> "subscribe to stream: #{state.stream} | start_from: #{state.start_from}" end)
@@ -59,8 +51,8 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     GenServer.call(pid, :result)
   end
 
-  def handle_call(:result, _from, state) do
-    {:reply, state.result, state}
+  def handle_call(:result, _from, %State{result: result} = state) do
+    {:reply, result, state}
   end
 
   def handle_info({:ack, last_seen_stream_version}, %State{inflight_events: inflight} = state) do
@@ -79,6 +71,8 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   end
 
   def handle_info({:on_event, event}, %State{} = state) do
+    Logger.debug(fn -> "Extreme event store subscription received event: #{inspect event}" end)
+
     event_type = event.event.event_type
 
     state = if "$" != String.first(event_type) do
@@ -107,13 +101,12 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     {:noreply, state}
   end
 
-  defp subscribe(%State{} = state) do
-    from_event_number =
-      case state.start_from do
-      	:origin -> 0
-      	:current -> nil
-      	event_number -> event_number
-      end
+  defp subscribe(%State{start_from: start_from, stream: stream} = state) do
+    from_event_number = case start_from do
+    	:origin -> 0
+    	:current -> nil
+    	event_number -> event_number
+    end
 
     receiver = spawn_receiver()
 
@@ -121,12 +114,11 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
       receiver_ref: Process.monitor(receiver),
     }
 
-    result =
-      case from_event_number do
-      	nil -> Extreme.subscribe_to(@event_store, receiver, state.stream)
-      	event_number -> Extreme.read_and_stay_subscribed(@event_store, receiver, state.stream, event_number)
-      end
-
+    result = case from_event_number do
+    	nil -> Extreme.subscribe_to(@event_store, receiver, stream)
+    	event_number -> Extreme.read_and_stay_subscribed(@event_store, receiver, stream, event_number)
+    end
+IO.puts "subscribe: #{inspect result}"
     case result do
       {:ok, _} -> %State{state | result: {:ok, self()}, receiver: receiver}
       err      -> %State{state | result: err}
@@ -138,8 +130,11 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
 
     Process.spawn(fn ->
       receive_loop = fn(loop) ->
+        IO.puts "waiting for events"
       	receive do
-      	  {:on_event, event} -> send(subscription, {:on_event, event})
+      	  {:on_event, event} ->
+            IO.puts "received event: #{inspect event}"
+            send(subscription, {:on_event, event})
       	end
 
         loop.(loop)
@@ -152,6 +147,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   defp unsubscribe(%State{} = state) do
     if state.receiver do
       Process.exit(state.receiver, :unsubscribe)
+
       %State{state | receiver: nil}
     else
       state

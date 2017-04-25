@@ -20,7 +20,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   alias Extreme.Messages, as: ExMsg
 
   @event_store Commanded.EventStore.Adapters.Extreme.EventStore
-  @stream_prefix Application.get_env(:commanded_extreme_adapter, :streams_prefix, nil)
+  @stream_prefix Application.get_env(:commanded_extreme_adapter, :stream_prefix, "commanded")
 
   defmodule State do
     defstruct [
@@ -137,45 +137,41 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  def handle_call({:unsubscribe_all, subscription_name}, _from, %State{subscriptions: subscriptions} = state) do
-    {subscription_pid, subscriptions} = Map.pop(subscriptions, subscription_name)
-
-    Process.exit(subscription_pid, :kill)
-
-    state = %State{state | subscriptions: subscriptions}
-
-    {:reply, :ok, state}
-  end
-
   def handle_call({:subscribe_all, subscription_name, subscriber, start_from, opts}, _from, %State{subscriptions: subscriptions} = state) do
     case subscriber == Map.get(subscriptions, subscription_name) do
       true ->
 	      {:reply, {:error, :subscription_already_exists}, state}
 
       false ->
-      	stream = case @stream_prefix do
-          nil -> "$ce"
-          prefix -> "$ce-" <> prefix
-        end
+      	stream = "$ce-" <> @stream_prefix
 
-      	{:ok, pid} = Subscription.start(stream, subscription_name, subscriber, start_from, opts)
+        IO.puts "subscribe to stream: #{inspect stream}"
+
+      	{:ok, subscription} = Subscription.start(stream, subscription_name, subscriber, start_from, opts)
 
         state = %State{state |
-          subscriptions: Map.put(subscriptions, subscription_name, pid),
+          subscriptions: Map.put(subscriptions, subscription_name, subscription),
         }
 
-      	{:reply, Subscription.result(pid), state}
+      	{:reply, Subscription.result(subscription), state}
     end
   end
 
-  defp prefix(suffix) do
-    case @stream_prefix do
-      nil -> suffix
-      stream_prefix -> stream_prefix <> "-" <> suffix
-    end
+  def handle_call({:unsubscribe_all, subscription_name}, _from, %State{subscriptions: subscriptions} = state) do
+    {subscription_pid, subscriptions} = Map.pop(subscriptions, subscription_name)
+
+    Process.exit(subscription_pid, :kill)
+
+    state = %State{state |
+      subscriptions: subscriptions,
+    }
+
+    {:reply, :ok, state}
   end
 
-  defp snapshot_stream(source_uuid), do: prefix("snapshot-" <> source_uuid)
+  defp prefix(suffix), do: @stream_prefix <> "-" <> suffix
+
+  defp snapshot_stream(source_uuid), do: @stream_prefix <> "snapshot-" <> source_uuid
 
   defp stream_name(stream), do: prefix(stream)
 
@@ -299,16 +295,12 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   defp to_stream_id(%Extreme.Messages.EventRecord{event_stream_id: event_stream_id}) do
-    prefix_len = case @stream_prefix do
-      nil -> 0
-      prefix -> String.length(prefix)
-    end
+    IO.puts "to_stream_id: #{inspect event_stream_id}"
 
-    String.slice(
-      event_stream_id,
-      prefix_len,
-      String.length(event_stream_id)
-    )
+    event_stream_id
+    |> String.split("-")
+    |> Enum.drop(1)
+    |> Enum.join("-")
   end
 
   defp to_naive_date_time(millis_since_epoch) do
