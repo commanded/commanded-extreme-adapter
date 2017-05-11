@@ -18,7 +18,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
       subscription_ref: nil,
       subscribed?: false,
       result: nil,
-      last_seen_event: nil,
+      last_seen_event_id: nil,
       last_seen_event_number: nil,
     ]
   end
@@ -65,11 +65,13 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     {:noreply, subscribe(state)}
   end
 
-  def handle_cast({:ack, event_number}, %State{subscription: subscription, last_seen_event: last_seen_event, last_seen_event_number: event_number} = state) do
-    :ok = Extreme.PersistentSubscription.ack(subscription, last_seen_event)
+  def handle_cast({:ack, event_number}, %State{subscription: subscription, last_seen_event_id: last_seen_event_id, last_seen_event_number: event_number} = state) do
+    Logger.debug(fn -> "Extreme event store ack event: #{inspect event_number}" end)
+
+    :ok = Extreme.PersistentSubscription.ack(subscription, last_seen_event_id)
 
     state = %State{state |
-      last_seen_event: nil,
+      last_seen_event_id: nil,
       last_seen_event_number: nil,
     }
 
@@ -91,11 +93,11 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
       send(subscriber, {:events, [recorded_event]})
 
       %State{state |
-        last_seen_event: event,
+        last_seen_event_id: event.link.event_id,
         last_seen_event_number: recorded_event.event_number,
       }
     else
-      Logger.debug(fn -> "ignoring event of type: #{inspect event_type}" end)
+      Logger.debug(fn -> "Extreme event store subscription ignoring event of type: #{inspect event_type}" end)
       state
     end
 
@@ -103,7 +105,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   end
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, %State{subscriber_ref: subscriber_ref, subscription_ref: subscription_ref} = state) do
-    Logger.debug(fn -> "Extreme event store subcription down due to: #{inspect reason}" end)
+    Logger.debug(fn -> "Extreme event store subscription down due to: #{inspect reason}" end)
 
     case {ref, reason} do
       {^subscriber_ref, _} ->
@@ -146,7 +148,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     message = ExMsg.CreatePersistentSubscription.new(
       subscription_group_name: name,
       event_stream_id: stream,
-      resolve_link_tos: false,
+      resolve_link_tos: true,
       start_from: from_event_number,
       message_timeout_milliseconds: 10_000,
       record_statistics: false,
@@ -154,7 +156,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
       read_batch_size: 20,
       buffer_size: 500,
       max_retry_count: 10,
-      prefer_round_robin: true,
+      prefer_round_robin: false,
       checkpoint_after_time: 1_000,
       checkpoint_max_count: 500,
       checkpoint_min_count: 1,
