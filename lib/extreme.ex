@@ -17,7 +17,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     SnapshotData,
   }
   alias Commanded.EventStore.Adapters.Extreme.Subscription
-  alias Extreme.Messages, as: ExMsg
+  alias Extreme.Msg, as: ExMsg
 
   @event_store Commanded.EventStore.Adapters.Extreme.EventStore
   @stream_prefix Application.get_env(:commanded_extreme_adapter, :stream_prefix, "commanded")
@@ -71,14 +71,14 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   @spec subscribe_to_all_streams(String.t, pid, Commanded.EventStore.start_from) :: {:ok, subscription :: any}
     | {:error, :subscription_already_exists}
     | {:error, reason :: term}
-  def subscribe_to_all_streams(subscription_name, subscriber, start_from \\ :origin, opts \\ [])
-  def subscribe_to_all_streams(subscription_name, subscriber, start_from, opts) do
-    GenServer.call(__MODULE__, {:subscribe_all, subscription_name, subscriber, start_from, opts})
+  def subscribe_to_all_streams(subscription_name, subscriber, start_from \\ :origin)
+  def subscribe_to_all_streams(subscription_name, subscriber, start_from) do
+    GenServer.call(__MODULE__, {:subscribe_all, subscription_name, subscriber, start_from})
   end
 
   @spec ack_event(pid, RecordedEvent.t) :: any
-  def ack_event(subscription, %RecordedEvent{} = last_seen_event) do
-    send(subscription, {:ack, last_seen_event.stream_version})
+  def ack_event(subscription, %RecordedEvent{event_number: event_number}) do
+    Subscription.ack(subscription, event_number)
   end
 
   @spec unsubscribe_from_all_streams(String.t) :: :ok
@@ -137,23 +137,21 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  def handle_call({:subscribe_all, subscription_name, subscriber, start_from, opts}, _from, %State{subscriptions: subscriptions} = state) do
-    case subscriber == Map.get(subscriptions, subscription_name) do
-      true ->
-	      {:reply, {:error, :subscription_already_exists}, state}
-
-      false ->
+  def handle_call({:subscribe_all, subscription_name, subscriber, start_from}, _from, %State{subscriptions: subscriptions} = state) do
+    case Map.get(subscriptions, subscription_name) do
+      nil ->
       	stream = "$ce-" <> @stream_prefix
 
-        IO.puts "subscribe to stream: #{inspect stream}"
-
-      	{:ok, subscription} = Subscription.start(stream, subscription_name, subscriber, start_from, opts)
+      	{:ok, subscription} = Subscription.start(stream, subscription_name, subscriber, start_from)
 
         state = %State{state |
           subscriptions: Map.put(subscriptions, subscription_name, subscription),
         }
 
       	{:reply, Subscription.result(subscription), state}
+
+      _subscriber ->
+	      {:reply, {:error, :subscription_already_exists}, state}
     end
   end
 
@@ -264,18 +262,12 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  def to_recorded_event(ev = %Extreme.Messages.ResolvedIndexedEvent{}) do
-    to_recorded_event(ev.event)
-  end
-
-  def to_recorded_event(ev = %Extreme.Messages.ResolvedEvent{}) do
-    to_recorded_event(ev.event)
-  end
-
-  def to_recorded_event(ev = %Extreme.Messages.EventRecord{}) do
+  def to_recorded_event(%ExMsg.ResolvedIndexedEvent{event: event}), do: to_recorded_event(event)
+  def to_recorded_event(%ExMsg.ResolvedEvent{event: event}), do: to_recorded_event(event)
+  def to_recorded_event(%ExMsg.EventRecord{} = ev) do
     data = @serializer.deserialize(ev.data, [type: ev.event_type])
 
-    {correlation_id, meta_data} =
+    {correlation_id, metadata} =
       case ev.metadata do
       	nil -> {nil, %{}}
       	"" -> {nil, %{}}
@@ -289,14 +281,12 @@ defmodule Commanded.EventStore.Adapters.Extreme do
       correlation_id: correlation_id,
       event_type: ev.event_type,
       data: data,
-      metadata: meta_data,
-      created_at: to_naive_date_time(ev.created_epoch)
+      metadata: metadata,
+      created_at: to_naive_date_time(ev.created_epoch),
     }
   end
 
-  defp to_stream_id(%Extreme.Messages.EventRecord{event_stream_id: event_stream_id}) do
-    IO.puts "to_stream_id: #{inspect event_stream_id}"
-
+  defp to_stream_id(%ExMsg.EventRecord{event_stream_id: event_stream_id}) do
     event_stream_id
     |> String.split("-")
     |> Enum.drop(1)
