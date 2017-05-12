@@ -36,7 +36,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   def append_to_stream(stream_uuid, expected_version, events) do
     stream = stream_name(stream_uuid)
 
-    Logger.debug(fn -> "attempting to append to stream \"#{stream}\" #{inspect length(events)} event(s)" end)
+    Logger.debug(fn -> "Extreme event store attempting to append to stream \"#{stream}\" #{inspect length(events)} event(s)" end)
 
     add_to_stream(stream, expected_version, events)
   end
@@ -90,7 +90,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   def read_snapshot(source_uuid) do
     stream = snapshot_stream(source_uuid)
 
-    Logger.debug(fn -> "read snapshot from stream: #{inspect stream}" end)
+    Logger.debug(fn -> "Extreme event store read snapshot from stream: #{inspect stream}" end)
 
     case read_backward(stream, -1, 1) do
       {:ok, [recorded_event]} ->
@@ -100,7 +100,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 	       {:error, :snapshot_not_found}
 
       err ->
-      	Logger.error(fn -> "error reading snapshot: #{inspect err}" end)
+      	Logger.error(fn -> "Extreme event store error reading snapshot: #{inspect err}" end)
       	err
     end
   end
@@ -110,7 +110,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     event_data = to_event_data(snapshot)
     stream = snapshot_stream(snapshot.source_uuid)
 
-    Logger.debug(fn -> "record snapshot to stream: #{inspect stream}" end)
+    Logger.debug(fn -> "Extreme event store record snapshot to stream: #{inspect stream}" end)
 
     case add_to_stream(stream, :any_version, [event_data]) do
       {:ok, _} -> :ok
@@ -144,6 +144,8 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 
       	{:ok, subscription} = Subscription.start(stream, subscription_name, subscriber, start_from)
 
+        Process.monitor(subscription)
+
         state = %State{state |
           subscriptions: Map.put(subscriptions, subscription_name, subscription),
         }
@@ -156,15 +158,35 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   def handle_call({:unsubscribe_all, subscription_name}, _from, %State{subscriptions: subscriptions} = state) do
-    {subscription_pid, subscriptions} = Map.pop(subscriptions, subscription_name)
+    state =
+      case Map.pop(subscriptions, subscription_name) do
+        {nil, subscriptions} ->
+          state
 
-    Process.exit(subscription_pid, :kill)
+        {subscription_pid, subscriptions} ->
+          Process.exit(subscription_pid, :kill)
 
-    state = %State{state |
-      subscriptions: subscriptions,
-    }
+          state = %State{state |
+            subscriptions: subscriptions,
+          }
+      end
 
     {:reply, :ok, state}
+  end
+
+  def handle_info({:DOWN, _ref, :process, pid, _reason}, %State{subscriptions: subscriptions} = state) do
+    state = %State{state |
+      subscriptions: remove_subscription_by_pid(subscriptions, pid),
+    }
+
+    {:noreply, state}
+  end
+
+  defp remove_subscription_by_pid(subscriptions, pid) do
+    Enum.reduce(subscriptions, subscriptions, fn
+      ({name, subscription}, acc) when subscription == pid -> Map.delete(acc, name)
+      (_, acc) -> acc
+    end)
   end
 
   defp prefix(suffix), do: @stream_prefix <> "-" <> suffix
