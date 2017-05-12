@@ -141,7 +141,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     from_event_number =
       case start_from do
       	:origin -> 0
-      	:current -> nil
+      	:current -> -1
       	event_number -> event_number
       end
 
@@ -165,7 +165,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
 
     case Extreme.execute(@event_store, message) do
       {:ok, %ExMsg.CreatePersistentSubscriptionCompleted{result: :Success}} -> :ok
-      {:ok, %ExMsg.CreatePersistentSubscriptionCompleted{result: :AlreadyExists}} -> :ok
+      {:error, :AlreadyExists, _response} -> :ok
       error -> error
     end
   end

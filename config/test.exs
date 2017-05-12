@@ -2,7 +2,7 @@ use Mix.Config
 
 config :ex_unit,
   capture_log: true,
-  assert_receive_timeout: 2_000
+  assert_receive_timeout: 5_000
 
 config :extreme, :event_store,
   db_type: :node,
