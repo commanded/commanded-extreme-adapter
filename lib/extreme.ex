@@ -262,9 +262,11 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  def to_recorded_event(%ExMsg.ResolvedIndexedEvent{event: event}), do: to_recorded_event(event)
-  def to_recorded_event(%ExMsg.ResolvedEvent{event: event}), do: to_recorded_event(event)
-  def to_recorded_event(%ExMsg.EventRecord{} = ev) do
+  def to_recorded_event(%ExMsg.ResolvedIndexedEvent{event: event, link: link}), do: to_recorded_event(event, link.event_number + 1)
+  def to_recorded_event(%ExMsg.ResolvedEvent{event: event}), do: to_recorded_event(event, event.event_number + 1)
+  def to_recorded_event(%ExMsg.EventRecord{} = event), do: to_recorded_event(event, event.event_number + 1)
+
+  def to_recorded_event(%ExMsg.EventRecord{} = ev, event_number) do
     data = @serializer.deserialize(ev.data, [type: ev.event_type])
 
     {correlation_id, metadata} =
@@ -275,9 +277,9 @@ defmodule Commanded.EventStore.Adapters.Extreme do
       end
 
     %RecordedEvent{
-      event_number: ev.event_number + 1,
+      event_number: event_number,
       stream_id: to_stream_id(ev),
-      stream_version: ev.event_number + 1,
+      stream_version: event_number,
       correlation_id: correlation_id,
       event_type: ev.event_type,
       data: data,
