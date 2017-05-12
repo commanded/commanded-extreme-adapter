@@ -195,9 +195,8 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 
   defp stream_name(stream), do: prefix(stream)
 
-  defp normalize_start_version(start_version) do
-    if (start_version > 0), do: start_version - 1, else: start_version
-  end
+  defp normalize_start_version(0), do: 0
+  defp normalize_start_version(start_version), do: start_version - 1
 
   defp to_snapshot_data(event = %RecordedEvent{}) do
     data =
@@ -266,14 +265,17 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 	      read_events = read_events ++ events
 
       	if end_of_stream? || length(read_events) == count do
-      	  {:ok, Enum.map(read_events, &to_recorded_event/1), end_of_stream?}
+          recorded_events = Enum.map(read_events, &to_recorded_event/1)
+
+      	  {:ok, recorded_events, end_of_stream?}
       	else
-                # can occur with soft deleted streams
+          # can occur with soft deleted streams
       	  start_version =
       	    case direction do
       	      :forward -> result.next_event_number
       	      :backward -> result.last_event_number
       	    end
+
       	  execute_read(stream, start_version, count, direction, read_events)
       	end
 
@@ -284,7 +286,12 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  def to_recorded_event(%ExMsg.ResolvedIndexedEvent{event: event, link: link}), do: to_recorded_event(event, link.event_number + 1)
+  def to_recorded_event(%ExMsg.ResolvedIndexedEvent{event: event, link: link}) do
+    case link do
+      nil -> to_recorded_event(event, event.event_number + 1)
+      link -> to_recorded_event(event, link.event_number + 1)
+    end
+  end
   def to_recorded_event(%ExMsg.ResolvedEvent{event: event}), do: to_recorded_event(event, event.event_number + 1)
   def to_recorded_event(%ExMsg.EventRecord{} = event), do: to_recorded_event(event, event.event_number + 1)
 
