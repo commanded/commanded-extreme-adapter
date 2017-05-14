@@ -34,7 +34,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
       {:extreme, github: "slashdotdash/extreme", tag: "6c0036909dcac2a79dd00f707d29fe7e0128aa5a"},
       {:ex_doc, "~> 0.15", only: :dev},
       {:hackney, "~> 1.8.0", override: true, only: :test},
-      {:httpoison, "~> 0.11.1", only: :test},
+      {:httpoison, "~> 0.11.1"},
       {:mix_test_watch, "~> 0.2", only: :dev},
     ]
   end
