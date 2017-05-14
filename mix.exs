@@ -27,10 +27,9 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp deps do
     [
-      {:commanded, path: "~/src/commanded", runtime: false},
+      {:commanded, "~> 0.10", runtime: false},
       {:docker, github: "bearice/elixir-docker", tag: "03809fc594b9706c106fc28b7ef03c2dbde2fe93", only: :test},
-      # {:extreme, "~> 0.8"},
-      {:extreme, path: "~/src/extreme"},
+      {:extreme, github: "slashdotdash/extreme", tag: "6c0036909dcac2a79dd00f707d29fe7e0128aa5a"},
       {:hackney, "~> 1.8.0", override: true},
       {:httpoison, "~> 0.11.1"},
       {:mix_test_watch, "~> 0.2", only: :dev},
