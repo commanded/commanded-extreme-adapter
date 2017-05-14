@@ -1,6 +1,8 @@
 defmodule Commanded.EventStore.Adapters.Extreme do
   @moduledoc """
-  Adapter to use Greg Young's Event Store, via the Extreme TCP client, for Commanded
+  Adapter to use Greg Young's Event Store[1], via the Extreme TCP client, with Commanded
+
+  [1] https://geteventstore.com/
   """
 
   @behaviour Commanded.EventStore
