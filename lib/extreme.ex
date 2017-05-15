@@ -49,25 +49,15 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     stream = stream_name(stream_uuid)
     start_version = normalize_start_version(start_version)
 
-    Stream.resource(
-      fn -> {start_version, false} end,
-      fn {next_version, halt?} = acc ->
-      	case halt? do
-      	  true -> {:halt, acc}
-      	  false ->
-      	    case execute_read(stream, next_version, read_batch_size, :forward) do
-      	      {:ok, events, end_of_stream?} ->
-      		      acc = {next_version + length(events), end_of_stream?}
-
-      		      {events, acc}
-
-      	       {:error, :stream_not_found} = err ->
-                 {[err], {next_version, true}}
-      	    end
-      	end
-      end,
-      fn(_) -> :ok end
-    )
+    case execute_read(stream, start_version, read_batch_size, :forward) do
+      {:error, reason} -> {:error, reason}
+      {:ok, events, true} -> events
+      {:ok, events, false} ->
+        Stream.concat(
+          events,
+          execute_stream_forward(stream, start_version + length(events), read_batch_size)
+        )
+    end
   end
 
   @spec subscribe_to_all_streams(String.t, pid, Commanded.EventStore.start_from) :: {:ok, subscription :: any}
@@ -184,6 +174,25 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     {:noreply, state}
   end
 
+  defp execute_stream_forward(stream, start_version, read_batch_size) do
+    Stream.resource(
+      fn -> {start_version, false} end,
+      fn {next_version, halt?} = acc ->
+        case halt? do
+          true -> {:halt, acc}
+          false ->
+            case execute_read(stream, next_version, read_batch_size, :forward) do
+              {:ok, events, end_of_stream?} ->
+                acc = {next_version + length(events), end_of_stream?}
+
+                {events, acc}
+            end
+        end
+      end,
+      fn(_) -> :ok end
+    )
+  end
+
   defp remove_subscription_by_pid(subscriptions, pid) do
     Enum.reduce(subscriptions, subscriptions, fn
       ({name, subscription}, acc) when subscription == pid -> Map.delete(acc, name)
@@ -262,7 +271,9 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   defp execute_read(stream, start_version, count, direction, read_events \\ []) do
-    case Extreme.execute(@event_store, read_events(stream, start_version, count, direction)) do
+    remaining_count = count - length(read_events)
+
+    case Extreme.execute(@event_store, read_events(stream, start_version, remaining_count, direction)) do
       {:ok, %ExMsg.ReadStreamEventsCompleted{is_end_of_stream: end_of_stream?, events: events} = result} ->
 	      read_events = read_events ++ events
 
@@ -278,7 +289,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
       	      :backward -> result.last_event_number
       	    end
 
-      	  execute_read(stream, start_version, count, direction, read_events)
+      	  execute_read(stream, start_version, remaining_count, direction, read_events)
       	end
 
       {:error, :NoStream, _} ->
