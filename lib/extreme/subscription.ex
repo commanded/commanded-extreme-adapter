@@ -178,15 +178,4 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   defp connect_to_persistent_subscription(%State{name: name, stream: stream}) do
     Extreme.connect_to_persistent_subscription(@event_store, self(), name, stream, 1)
   end
-
-  defp unsubscribe(%State{} = state) do
-    state
-    # if state.receiver do
-    #   Process.exit(state.receiver, :unsubscribe)
-    #
-    #   %State{state | receiver: nil}
-    # else
-    #   state
-    # end
-  end
 end

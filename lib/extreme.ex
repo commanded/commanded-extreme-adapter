@@ -152,13 +152,13 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   def handle_call({:unsubscribe_all, subscription_name}, _from, %State{subscriptions: subscriptions} = state) do
     state =
       case Map.pop(subscriptions, subscription_name) do
-        {nil, subscriptions} ->
+        {nil, _subscriptions} ->
           state
 
         {subscription_pid, subscriptions} ->
           Process.exit(subscription_pid, :kill)
 
-          state = %State{state |
+          %State{state |
             subscriptions: subscriptions,
           }
       end
