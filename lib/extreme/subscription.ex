@@ -18,6 +18,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
       subscription_ref: nil,
       subscribed?: false,
       result: nil,
+      last_seen_correlation_id: nil,
       last_seen_event_id: nil,
       last_seen_event_number: nil,
     ]
@@ -65,10 +66,10 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     {:noreply, subscribe(state)}
   end
 
-  def handle_cast({:ack, event_number}, %State{subscription: subscription, last_seen_event_id: last_seen_event_id, last_seen_event_number: event_number} = state) do
+  def handle_cast({:ack, event_number}, %State{subscription: subscription, last_seen_correlation_id: correlation_id, last_seen_event_id: event_id, last_seen_event_number: event_number} = state) do
     Logger.debug(fn -> "Extreme event store ack event: #{inspect event_number}" end)
 
-    :ok = Extreme.PersistentSubscription.ack(subscription, last_seen_event_id)
+    :ok = Extreme.PersistentSubscription.ack(subscription, event_id, correlation_id)
 
     state = %State{state |
       last_seen_event_id: nil,
@@ -82,7 +83,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     {:reply, result, state}
   end
 
-  def handle_info({:on_event, event}, %State{subscriber: subscriber} = state) do
+  def handle_info({:on_event, event, correlation_id}, %State{subscriber: subscriber, subscription: subscription} = state) do
     Logger.debug(fn -> "Extreme event store subscription received event: #{inspect event}" end)
 
     event_type = event.event.event_type
@@ -93,11 +94,15 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
       send(subscriber, {:events, [recorded_event]})
 
       %State{state |
+        last_seen_correlation_id: correlation_id,
         last_seen_event_id: event.link.event_id,
         last_seen_event_number: recorded_event.event_number,
       }
     else
       Logger.debug(fn -> "Extreme event store subscription ignoring event of type: #{inspect event_type}" end)
+
+      :ok = Extreme.PersistentSubscription.ack(subscription, event.link.event_id, correlation_id)
+
       state
     end
 
