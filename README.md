@@ -16,7 +16,7 @@ MIT License
 
 The package can be installed from hex as follows.
 
-  1. Add `commanded_extreme_adapter` to your list of dependencies in `mix.exs`:
+1. Add `commanded_extreme_adapter` to your list of dependencies in `mix.exs`:
 
     ```elixir
     def deps do
@@ -24,14 +24,14 @@ The package can be installed from hex as follows.
     end
     ```
 
-  2. Configure Commanded to use the event store adapter:
+2. Configure Commanded to use the event store adapter:
 
     ```elixir
     config :commanded,
       event_store_adapter: Commanded.EventStore.Adapters.Extreme
     ```
 
-  3. Configure the `extreme` library connection with your event store connection details:
+3. Configure the `extreme` library connection with your event store connection details:
 
     ```elixir
     config :extreme, :event_store,
@@ -44,7 +44,7 @@ The package can be installed from hex as follows.
       max_attempts: :infinity
     ```
 
-  4. Configure the `commanded_extreme_adapter` to specify a stream prefix to be used by all Commanded event streams:
+4. Configure the `commanded_extreme_adapter` to specify a stream prefix to be used by all Commanded event streams:
 
     ```elixir
     config :commanded_extreme_adapter,
@@ -53,7 +53,7 @@ The package can be installed from hex as follows.
 
     **Note** Stream prefix *must not* contain a dash character ("-").
 
-  5. Force a (re)compile of the Commanded dependency to include the configured adapter:
+5. Force a (re)compile of the Commanded dependency to include the configured adapter:
 
     ```console
     $ mix deps.compile commanded --force
