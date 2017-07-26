@@ -10,5 +10,4 @@ config :extreme, :event_store,
   max_attempts: :infinity
 
 config :commanded_extreme_adapter,
-  serializer: Commanded.Serialization.JsonSerializer,
   stream_prefix: "commandeddev"

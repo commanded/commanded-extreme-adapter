@@ -18,11 +18,11 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     RecordedEvent,
     SnapshotData,
   }
-  alias Commanded.EventStore.Adapters.Extreme.Subscription
+  alias Commanded.EventStore.Adapters.Extreme.{Config,Subscription}
   alias Extreme.Msg, as: ExMsg
 
   @event_store Commanded.EventStore.Adapters.Extreme.EventStore
-  @stream_prefix Application.get_env(:commanded_extreme_adapter, :stream_prefix, "commanded")
+  @stream_prefix Config.stream_prefix()
 
   defmodule State do
     defstruct [
