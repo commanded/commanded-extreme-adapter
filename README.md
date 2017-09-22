@@ -20,7 +20,7 @@ The package can be installed from hex as follows.
 
     ```elixir
     def deps do
-      [{:commanded_extreme_adapter, "~> 0.1"}]
+      [{:commanded_extreme_adapter, "~> 0.2"}]
     end
     ```
 
@@ -31,7 +31,7 @@ The package can be installed from hex as follows.
       event_store_adapter: Commanded.EventStore.Adapters.Extreme
     ```
 
-3. Configure the `extreme` library connection with your event store connection details:
+3. Configure the `extreme` library connection with your Event Store connection details:
 
     ```elixir
     config :extreme, :event_store,
