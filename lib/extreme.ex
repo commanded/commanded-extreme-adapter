@@ -1,8 +1,7 @@
 defmodule Commanded.EventStore.Adapters.Extreme do
   @moduledoc """
-  Adapter to use Greg Young's Event Store[1], via the Extreme TCP client, with Commanded
-
-  [1] https://geteventstore.com/
+  Adapter to use Greg Young's [Event Store](https://geteventstore.com/), via the
+  Extreme TCP client, with Commanded.
   """
 
   @behaviour Commanded.EventStore
@@ -11,7 +10,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 
   use GenServer
   use Commanded.EventStore.Serializer
-  use Commanded.EventStore.TypeProvider
 
   alias Commanded.EventStore.{
     EventData,
@@ -19,6 +17,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     SnapshotData,
   }
   alias Commanded.EventStore.Adapters.Extreme.{Config,Subscription}
+  alias Commanded.EventStore.TypeProvider
   alias Extreme.Msg, as: ExMsg
 
   @event_store Commanded.EventStore.Adapters.Extreme.EventStore
@@ -98,7 +97,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   @spec record_snapshot(SnapshotData.t) :: :ok | {:error, reason :: term}
-  def record_snapshot(snapshot = %SnapshotData{}) do
+  def record_snapshot(%SnapshotData{} = snapshot) do
     event_data = to_event_data(snapshot)
     stream = snapshot_stream(snapshot.source_uuid)
 
@@ -209,14 +208,14 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   defp normalize_start_version(0), do: 0
   defp normalize_start_version(start_version), do: start_version - 1
 
-  defp to_snapshot_data(event = %RecordedEvent{}) do
+  defp to_snapshot_data(%RecordedEvent{data: snapshot} = event) do
     data =
-      event.data.source_type
+      snapshot.source_type
       |> String.to_existing_atom()
-      |> struct(with_atom_keys(event.data.data))
+      |> struct(with_atom_keys(snapshot.data))
       |> Commanded.Serialization.JsonDecoder.decode()
 
-    %SnapshotData{event.data |
+    %SnapshotData{snapshot |
       data: data,
       created_at: event.created_at,
     }
@@ -228,12 +227,10 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end)
   end
 
-  defp to_event_data(snapshot = %SnapshotData{}) do
-    %EventData {
-      correlation_id: nil,
-      event_type: @type_provider.to_string(snapshot),
-      data: to_raw_event_data(snapshot),
-      metadata: nil
+  defp to_event_data(%SnapshotData{} = snapshot) do
+    %EventData{
+      event_type: TypeProvider.to_string(snapshot),
+      data: snapshot,
     }
   end
 
@@ -309,19 +306,22 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   def to_recorded_event(%ExMsg.EventRecord{} = event), do: to_recorded_event(event, event.event_number + 1)
 
   def to_recorded_event(%ExMsg.EventRecord{} = ev, event_number) do
-    data = @serializer.deserialize(ev.data, [type: ev.event_type])
+    data = deserialize(ev.data, type: ev.event_type)
 
-    {correlation_id, metadata} =
+    metadata =
       case ev.metadata do
-      	nil -> {nil, %{}}
-      	"" -> {nil, %{}}
-      	meta -> Map.pop(Poison.decode!(meta), "$correlationId")
+      	none when none in [nil, ""] -> %{}
+      	metadata -> deserialize(metadata)
       end
+
+    {causation_id, metadata} = Map.pop(metadata, "$causationId")
+    {correlation_id, metadata} = Map.pop(metadata, "$correlationId")
 
     %RecordedEvent{
       event_number: event_number,
       stream_id: to_stream_id(ev),
       stream_version: event_number,
+      causation_id: causation_id,
       correlation_id: correlation_id,
       event_type: ev.event_type,
       data: data,
@@ -358,24 +358,15 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     )
   end
 
-  defp to_raw_event_data(data) when is_map(data), do: @serializer.serialize(data)
-  defp to_raw_event_data(data), do: data
+  defp serialize(data), do: @serializer.serialize(data)
+  defp deserialize(data, opts \\ []), do: @serializer.deserialize(data, opts)
 
-  defp add_correlation_id(meta, cid) when is_nil(meta) and is_binary(cid) do
-    add_correlation_id(%{}, cid)
-  end
-  defp add_correlation_id(meta = %{}, cid) when is_binary(cid) do
-    Map.put(meta, "$correlationId", cid)
-  end
-  defp add_correlation_id(meta, cid) when is_nil(cid) do
-    meta
-  end
-  defp add_correlation_id(meta, cid) when is_binary(meta) do
-    add_correlation_id(@serializer.deserialize(meta, []), cid)
-  end
-  defp add_correlation_id(meta, cid) do
-    add_correlation_id(Map.from_struct(meta), cid)
-  end
+  defp add_causation_id(metadata, causation_id), do: add_to_metadata(metadata, "$causationId", causation_id)
+  defp add_correlation_id(metadata, correlation_id), do: add_to_metadata(metadata, "$correlationId", correlation_id)
+
+  defp add_to_metadata(metadata, key, value) when is_nil(metadata), do: add_to_metadata(%{}, key, value)
+  defp add_to_metadata(metadata, _key, value) when is_nil(value), do: metadata
+  defp add_to_metadata(metadata, key, value), do: Map.put(metadata, key, value)
 
   defp write_events(stream_id, expected_version, events) do
     expected_version =
@@ -385,15 +376,18 @@ defmodule Commanded.EventStore.Adapters.Extreme do
       end
 
     proto_events = Enum.map(events, fn event ->
-      meta_data = add_correlation_id(event.metadata, event.correlation_id)
+      metadata =
+        event.metadata
+        |> add_causation_id(event.causation_id)
+        |> add_correlation_id(event.correlation_id)
 
       ExMsg.NewEvent.new(
         event_id: UUID.uuid4() |> UUID.string_to_binary!(),
         event_type: event.event_type,
         data_content_type: 0,
         metadata_content_type: 0,
-        data: to_raw_event_data(event.data),
-        metadata: to_raw_event_data(meta_data),
+        data: serialize(event.data),
+        metadata: serialize(metadata),
       )
     end)
 

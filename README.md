@@ -20,7 +20,7 @@ The package can be installed from hex as follows.
 
     ```elixir
     def deps do
-      [{:commanded_extreme_adapter, "~> 0.2"}]
+      [{:commanded_extreme_adapter, "~> 0.3"}]
     end
     ```
 
@@ -52,12 +52,6 @@ The package can be installed from hex as follows.
     ```
 
     **Note** Stream prefix *must not* contain a dash character ("-").
-
-5. Force a (re)compile of the Commanded dependency to include the configured adapter:
-
-    ```console
-    $ mix deps.compile commanded --force
-    ```
 
 You **must** run the Event Store with all projections enabled and standard projections started. Use the `--run-projections=all --start-standard-projections=true` flags when running the Event Store executable.
 
