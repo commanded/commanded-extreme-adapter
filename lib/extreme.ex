@@ -67,7 +67,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     GenServer.call(__MODULE__, {:subscribe_all, subscription_name, subscriber, start_from})
   end
 
-  @spec ack_event(pid, RecordedEvent.t) :: any
+  @spec ack_event(pid, RecordedEvent.t) :: :ok
   def ack_event(subscription, %RecordedEvent{event_number: event_number}) do
     Subscription.ack(subscription, event_number)
   end
