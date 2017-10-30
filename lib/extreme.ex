@@ -318,6 +318,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     {correlation_id, metadata} = Map.pop(metadata, "$correlationId")
 
     %RecordedEvent{
+      event_id: ev.event_id,
       event_number: event_number,
       stream_id: to_stream_id(ev),
       stream_version: event_number,
