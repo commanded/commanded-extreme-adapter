@@ -53,7 +53,7 @@ Extreme event store adapter for Commanded
       ],
       maintainers: ["Ben Smith"],
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/slashdotdash/commanded-extreme-adapter",
+      links: %{"GitHub" => "https://github.com/commanded/commanded-extreme-adapter",
                "Docs" => "https://hexdocs.pm/commanded_extreme_adapter/"}
     ]
   end

@@ -1,6 +1,6 @@
 # Extreme event store adapter for Commanded
 
-Use Greg Young's [Event Store](https://geteventstore.com/) with [Commanded](https://github.com/slashdotdash/commanded) using the [Extreme](https://github.com/exponentially/extreme) Elixir TCP client.
+Use Greg Young's [Event Store](https://geteventstore.com/) with [Commanded](https://github.com/commanded/commanded) using the [Extreme](https://github.com/exponentially/extreme) Elixir TCP client.
 
 ---
 
@@ -8,7 +8,7 @@ Use Greg Young's [Event Store](https://geteventstore.com/) with [Commanded](http
 
 MIT License
 
-[![Build Status](https://travis-ci.org/slashdotdash/commanded-extreme-adapter.svg?branch=master)](https://travis-ci.org/slashdotdash/commanded-extreme-adapter)
+[![Build Status](https://travis-ci.org/commanded/commanded-extreme-adapter.svg?branch=master)](https://travis-ci.org/commanded/commanded-extreme-adapter)
 
 ---
 
