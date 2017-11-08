@@ -9,7 +9,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   require Logger
 
   use GenServer
-  use Commanded.EventStore.Serializer
 
   alias Commanded.EventStore.{
     EventData,
@@ -19,9 +18,11 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   alias Commanded.EventStore.Adapters.Extreme.{Config,Subscription}
   alias Commanded.EventStore.TypeProvider
   alias Extreme.Msg, as: ExMsg
+  alias Commanded.EventStore.Adapters.Extreme.Config
 
   @event_store Commanded.EventStore.Adapters.Extreme.EventStore
   @stream_prefix Config.stream_prefix()
+  @serializer Config.serializer()
 
   defmodule State do
     defstruct [
@@ -67,7 +68,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     GenServer.call(__MODULE__, {:subscribe_all, subscription_name, subscriber, start_from})
   end
 
-  @spec ack_event(pid, RecordedEvent.t) :: any
+  @spec ack_event(pid, RecordedEvent.t) :: :ok
   def ack_event(subscription, %RecordedEvent{event_number: event_number}) do
     Subscription.ack(subscription, event_number)
   end
@@ -318,6 +319,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     {correlation_id, metadata} = Map.pop(metadata, "$correlationId")
 
     %RecordedEvent{
+      event_id: ev.event_id,
       event_number: event_number,
       stream_id: to_stream_id(ev),
       stream_version: event_number,

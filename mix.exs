@@ -4,8 +4,8 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
   def project do
     [
       app: :commanded_extreme_adapter,
-      version: "0.3.0",
-      elixir: "~> 1.4",
+      version: "0.4.0",
+      elixir: "~> 1.5",
       elixirc_paths: elixirc_paths(Mix.env),
       description: description(),
       package: package(),
@@ -29,7 +29,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp deps do
     [
-      {:commanded, "~> 0.14", runtime: false},
+      {:commanded, ">= 0.15.0", runtime: false},
       {:docker, github: "bearice/elixir-docker", tag: "03809fc594b9706c106fc28b7ef03c2dbde2fe93", only: :test},
       {:extreme, "~> 0.10"},
       {:ex_doc, "~> 0.15", only: :dev},
@@ -53,7 +53,7 @@ Extreme event store adapter for Commanded
       ],
       maintainers: ["Ben Smith"],
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/slashdotdash/commanded-extreme-adapter",
+      links: %{"GitHub" => "https://github.com/commanded/commanded-extreme-adapter",
                "Docs" => "https://hexdocs.pm/commanded_extreme_adapter/"}
     ]
   end

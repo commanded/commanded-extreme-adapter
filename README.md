@@ -1,6 +1,6 @@
 # Extreme event store adapter for Commanded
 
-Use Greg Young's [Event Store](https://geteventstore.com/) with [Commanded](https://github.com/slashdotdash/commanded) using the [Extreme](https://github.com/exponentially/extreme) Elixir TCP client.
+Use Greg Young's [Event Store](https://geteventstore.com/) with [Commanded](https://github.com/commanded/commanded) using the [Extreme](https://github.com/exponentially/extreme) Elixir TCP client.
 
 ---
 
@@ -8,7 +8,7 @@ Use Greg Young's [Event Store](https://geteventstore.com/) with [Commanded](http
 
 MIT License
 
-[![Build Status](https://travis-ci.org/slashdotdash/commanded-extreme-adapter.svg?branch=master)](https://travis-ci.org/slashdotdash/commanded-extreme-adapter)
+[![Build Status](https://travis-ci.org/commanded/commanded-extreme-adapter.svg?branch=master)](https://travis-ci.org/commanded/commanded-extreme-adapter)
 
 ---
 
@@ -44,10 +44,11 @@ The package can be installed from hex as follows.
       max_attempts: :infinity
     ```
 
-4. Configure the `commanded_extreme_adapter` to specify a stream prefix to be used by all Commanded event streams:
+4. Configure the `commanded_extreme_adapter` to specify the JSON serializer and a stream prefix to be used by all Commanded event streams:
 
     ```elixir
     config :commanded_extreme_adapter,
+      serializer: Commanded.Serialization.JsonSerializer,
       stream_prefix: "commandeddev"
     ```
 

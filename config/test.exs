@@ -12,6 +12,7 @@ config :extreme, :event_store,
   password: "changeit",
   reconnect_delay: 2_000,
   max_attempts: :infinity
-
+  
 config :commanded_extreme_adapter,
+  serializer: Commanded.Serialization.JsonSerializer,
   stream_prefix: "commandedtest"
