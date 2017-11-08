@@ -1,6 +1,6 @@
 # Changelog
 
-## Next release (v0.4.0)
+## v0.4.0
 
 - Include `event_id` in recorded event data.
 

@@ -5,7 +5,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
     [
       app: :commanded_extreme_adapter,
       version: "0.4.0",
-      elixir: "~> 1.4",
+      elixir: "~> 1.5",
       elixirc_paths: elixirc_paths(Mix.env),
       description: description(),
       package: package(),
