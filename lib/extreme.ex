@@ -9,7 +9,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   require Logger
 
   use GenServer
-  use Commanded.EventStore.Serializer
 
   alias Commanded.EventStore.{
     EventData,
@@ -19,9 +18,11 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   alias Commanded.EventStore.Adapters.Extreme.{Config,Subscription}
   alias Commanded.EventStore.TypeProvider
   alias Extreme.Msg, as: ExMsg
+  alias Commanded.EventStore.Adapters.Extreme.Config
 
   @event_store Commanded.EventStore.Adapters.Extreme.EventStore
   @stream_prefix Config.stream_prefix()
+  @serializer Config.serializer()
 
   defmodule State do
     defstruct [
