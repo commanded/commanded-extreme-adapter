@@ -20,7 +20,7 @@ The package can be installed from hex as follows.
 
     ```elixir
     def deps do
-      [{:commanded_extreme_adapter, "~> 0.3"}]
+      [{:commanded_extreme_adapter, "~> 0.4"}]
     end
     ```
 
