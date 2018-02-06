@@ -5,9 +5,11 @@ defmodule Commanded.EventStore.Adapters.Extreme.ResetStorage do
     Application.stop(:commanded_extreme_adapter)
     Application.stop(:extreme)
 
-  	reset_extreme_storage()
+  	:ok = reset_extreme_storage()
 
-  	Application.ensure_all_started(:commanded_extreme_adapter)
+  	{:ok, _} = Application.ensure_all_started(:commanded_extreme_adapter)
+
+    :ok
   end
 
   defp reset_extreme_storage do

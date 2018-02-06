@@ -1,6 +1,6 @@
 defmodule Commanded.EventStore.Adapters.Extreme do
   @moduledoc """
-  Adapter to use Greg Young's [Event Store](https://geteventstore.com/), via the
+  Adapter to use Greg Young's [Event Store](https://eventstore.org/), via the
   Extreme TCP client, with Commanded.
   """
 
@@ -129,6 +129,8 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
+  def init(%State{} = state), do: {:ok, state}
+
   def handle_call({:subscribe_all, subscription_name, subscriber, start_from}, _from, %State{subscriptions: subscriptions} = state) do
     case Map.get(subscriptions, subscription_name) do
       nil ->
@@ -142,7 +144,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
           subscriptions: Map.put(subscriptions, subscription_name, subscription),
         }
 
-      	{:reply, Subscription.result(subscription), state}
+      	{:reply, {:ok, subscription}, state}
 
       _subscriber ->
 	      {:reply, {:error, :subscription_already_exists}, state}

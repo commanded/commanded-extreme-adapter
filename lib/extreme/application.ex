@@ -7,8 +7,11 @@ defmodule Commanded.EventStore.Adapters.Extreme.Application do
     import Supervisor.Spec, warn: false
 
     children = [
-      worker(Extreme, [Config.event_store_settings(), [name: Commanded.EventStore.Adapters.Extreme.EventStore]]),
-      worker(Commanded.EventStore.Adapters.Extreme, []),
+      worker(Extreme, [
+        Config.event_store_settings(),
+        [name: Commanded.EventStore.Adapters.Extreme.EventStore]
+      ]),
+      worker(Commanded.EventStore.Adapters.Extreme, [])
     ]
 
     opts = [strategy: :one_for_one, name: Commanded.EventStore.Adapters.Extreme.Supervisor]

@@ -9,18 +9,18 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
 
   defmodule State do
     defstruct [
-      stream: nil,
+      last_seen_correlation_id: nil,
+      last_seen_event_id: nil,
+      last_seen_event_number: nil,
       name: nil,
+      retry_interval: nil,
+      stream: nil,
       start_from: nil,
       subscriber: nil,
       subscriber_ref: nil,
       subscription: nil,
       subscription_ref: nil,
-      subscribed?: false,
-      result: nil,
-      last_seen_correlation_id: nil,
-      last_seen_event_id: nil,
-      last_seen_event_number: nil,
+      subscribed?: false
     ]
   end
 
@@ -36,6 +36,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
       name: subscription_name,
       subscriber: subscriber,
       start_from: start_from,
+      retry_interval: subscription_retry_interval()
     })
   end
 
@@ -51,23 +52,13 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
       subscriber_ref: Process.monitor(subscriber),
     }
 
-    GenServer.cast(self(), {:subscribe})
+    send(self(), :subscribe)
 
     {:ok, state}
   end
 
-  def result(subscription) do
-    GenServer.call(subscription, :result)
-  end
-
-  def handle_cast({:subscribe}, state) do
-    Logger.debug(fn -> "Extreme event store subscribe to stream: #{inspect state.stream}, start from: #{inspect state.start_from}" end)
-
-    {:noreply, subscribe(state)}
-  end
-
   def handle_cast({:ack, event_number}, %State{subscription: subscription, last_seen_correlation_id: correlation_id, last_seen_event_id: event_id, last_seen_event_number: event_number} = state) do
-    Logger.debug(fn -> "Extreme event store ack event: #{inspect event_number}" end)
+    Logger.debug(fn -> describe(state) <> " ack event: #{inspect event_number}" end)
 
     :ok = Extreme.PersistentSubscription.ack(subscription, event_id, correlation_id)
 
@@ -79,12 +70,14 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     {:noreply, state}
   end
 
-  def handle_call(:result, _from, %State{result: result} = state) do
-    {:reply, result, state}
+  def handle_info(:subscribe, state) do
+    Logger.debug(fn -> describe(state) <> " to stream: #{inspect state.stream}, start from: #{inspect state.start_from}" end)
+
+    {:noreply, subscribe(state)}
   end
 
   def handle_info({:on_event, event, correlation_id}, %State{subscriber: subscriber, subscription: subscription} = state) do
-    Logger.debug(fn -> "Extreme event store subscription received event: #{inspect event}" end)
+    Logger.debug(fn -> describe(state) <> " received event: #{inspect event}" end)
 
     event_type = event.event.event_type
 
@@ -99,7 +92,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
         last_seen_event_number: recorded_event.event_number,
       }
     else
-      Logger.debug(fn -> "Extreme event store subscription ignoring event of type: #{inspect event_type}" end)
+      Logger.debug(fn -> describe(state) <> " ignoring event of type: #{inspect event_type}" end)
 
       :ok = Extreme.PersistentSubscription.ack(subscription, event.link.event_id, correlation_id)
 
@@ -109,8 +102,10 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     {:noreply, state}
   end
 
-  def handle_info({:DOWN, ref, :process, _pid, reason}, %State{subscriber_ref: subscriber_ref, subscription_ref: subscription_ref} = state) do
-    Logger.debug(fn -> "Extreme event store subscription down due to: #{inspect reason}" end)
+  def handle_info({:DOWN, ref, :process, _pid, reason}, %State{} = state) do
+    Logger.debug(fn -> describe(state) <> " down due to: #{inspect reason}" end)
+
+    %State{subscriber_ref: subscriber_ref, subscription_ref: subscription_ref} = state
 
     case {ref, reason} do
       {^subscriber_ref, _} ->
@@ -127,19 +122,29 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   defp subscribe(%State{} = state) do
     with :ok <- create_persistent_subscription(state),
          {:ok, subscription} <- connect_to_persistent_subscription(state) do
+
+      :ok = notify_subscribed(state)
+
       %State{state |
-        result: {:ok, self()},
         subscription: subscription,
         subscription_ref: Process.monitor(subscription),
         subscribed?: true,
       }
     else
       err ->
-        %State{state |
-          result: err,
-          subscribed?: false,
-        }
+        %State{retry_interval: retry_interval} = state
+
+        Logger.debug(fn -> describe(state) <> " failed to subscribe due to: #{inspect err}. Will retry in #{retry_interval}ms" end)
+
+        Process.send_after(self(), :subscribe, retry_interval)
+
+        %State{state | subscribed?: false}
     end
+  end
+
+  defp notify_subscribed(%State{subscriber: subscriber}) do
+    send(subscriber, {:subscribed, self()})
+    :ok
   end
 
   defp create_persistent_subscription(%State{name: name, stream: stream, start_from: start_from}) do
@@ -177,5 +182,24 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
 
   defp connect_to_persistent_subscription(%State{name: name, stream: stream}) do
     Extreme.connect_to_persistent_subscription(@event_store, self(), name, stream, 1)
+  end
+
+  # Get the delay between subscription attempts, in milliseconds, from app
+  # config. The default value is one minute. The minimum allowed value is one
+  # second.
+  defp subscription_retry_interval do
+    case Application.get_env(:commanded_extreme_adapter, :subscription_retry_interval) do
+      interval when is_integer(interval) and interval > 0 ->
+        # ensure interval is no less than one second
+        min(interval, 1_000)
+
+      _ ->
+        # default to 60s
+        60_000
+    end
+  end
+
+  defp describe(%State{name: name}) do
+    "Extreme event store subscription #{inspect name}"
   end
 end
