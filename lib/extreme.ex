@@ -24,16 +24,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   @stream_prefix Config.stream_prefix()
   @serializer Config.serializer()
 
-  defmodule State do
-    defstruct [
-      subscriptions: %{},
-    ]
-  end
-
-  def start_link do
-    GenServer.start_link(__MODULE__, %State{}, name: __MODULE__)
-  end
-
   @spec append_to_stream(String.t, non_neg_integer, list(EventData.t)) :: {:ok, stream_version :: non_neg_integer} | {:error, reason :: term}
   def append_to_stream(stream_uuid, expected_version, events) do
     stream = stream_name(stream_uuid)
@@ -65,7 +55,12 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     | {:error, reason :: term}
   def subscribe_to_all_streams(subscription_name, subscriber, start_from \\ :origin)
   def subscribe_to_all_streams(subscription_name, subscriber, start_from) do
-    GenServer.call(__MODULE__, {:subscribe_all, subscription_name, subscriber, start_from})
+    stream = "$ce-" <> @stream_prefix
+
+    case SubscriptionsSupervisor.start_subscription(stream, subscription_name, subscriber, start_from) do
+      {:ok, subscription} -> {:ok, subscription}
+      {:error, {:already_started, _}} -> {:error, :subscription_already_exists}
+    end
   end
 
   @spec ack_event(pid, RecordedEvent.t) :: :ok
@@ -75,7 +70,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 
   @spec unsubscribe_from_all_streams(String.t) :: :ok
   def unsubscribe_from_all_streams(subscription_name) do
-    GenServer.call(__MODULE__, {:unsubscribe_all, subscription_name})
+    SubscriptionsSupervisor.stop_subscription(subscription_name)
   end
 
   @spec read_snapshot(String.t) :: {:ok, SnapshotData.t} | {:error, :snapshot_not_found}
@@ -127,26 +122,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
       {:ok, _} -> :ok
       err -> err
     end
-  end
-
-  def init(%State{} = state), do: {:ok, state}
-
-  def handle_call({:subscribe_all, subscription_name, subscriber, start_from}, _from, %State{} = state) do
-    stream = "$ce-" <> @stream_prefix
-
-    reply =
-      case SubscriptionsSupervisor.start_subscription(stream, subscription_name, subscriber, start_from) do
-        {:ok, subscription} -> {:ok, subscription}
-        {:error, {:already_started, _}} -> {:error, :subscription_already_exists}
-      end
-
-    {:reply, reply, state}
-  end
-
-  def handle_call({:unsubscribe_all, subscription_name}, _from, %State{} = state) do
-    result = SubscriptionsSupervisor.stop_subscription(subscription_name)
-
-    {:reply, result, state}
   end
 
   defp execute_stream_forward(stream, start_version, read_batch_size) do

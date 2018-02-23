@@ -11,8 +11,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Application do
         Config.event_store_settings(),
         [name: Commanded.EventStore.Adapters.Extreme.EventStore]
       ]),
-      supervisor(Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor, []),
-      worker(Commanded.EventStore.Adapters.Extreme, [])
+      supervisor(Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor, [])
     ]
 
     opts = [strategy: :one_for_one, name: Commanded.EventStore.Adapters.Extreme.Supervisor]
