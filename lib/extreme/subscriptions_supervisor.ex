@@ -19,7 +19,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor do
       __MODULE__,
       subscription_spec(stream, subscription_name, subscriber, start_from)
     )
-    |> case  do
+    |> case do
       {:error, :already_present} -> Supervisor.restart_child(__MODULE__, subscription_name)
       other -> other
     end
