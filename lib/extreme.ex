@@ -15,7 +15,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     RecordedEvent,
     SnapshotData,
   }
-  alias Commanded.EventStore.Adapters.Extreme.{Config,Subscription}
+  alias Commanded.EventStore.Adapters.Extreme.{Config,Subscription,SubscriptionsSupervisor}
   alias Commanded.EventStore.TypeProvider
   alias Extreme.Msg, as: ExMsg
   alias Commanded.EventStore.Adapters.Extreme.Config
@@ -131,49 +131,22 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 
   def init(%State{} = state), do: {:ok, state}
 
-  def handle_call({:subscribe_all, subscription_name, subscriber, start_from}, _from, %State{subscriptions: subscriptions} = state) do
-    case Map.get(subscriptions, subscription_name) do
-      nil ->
-      	stream = "$ce-" <> @stream_prefix
+  def handle_call({:subscribe_all, subscription_name, subscriber, start_from}, _from, %State{} = state) do
+    stream = "$ce-" <> @stream_prefix
 
-      	{:ok, subscription} = Subscription.start(stream, subscription_name, subscriber, start_from)
-
-        Process.monitor(subscription)
-
-        state = %State{state |
-          subscriptions: Map.put(subscriptions, subscription_name, subscription),
-        }
-
-      	{:reply, {:ok, subscription}, state}
-
-      _subscriber ->
-	      {:reply, {:error, :subscription_already_exists}, state}
-    end
-  end
-
-  def handle_call({:unsubscribe_all, subscription_name}, _from, %State{subscriptions: subscriptions} = state) do
-    state =
-      case Map.pop(subscriptions, subscription_name) do
-        {nil, _subscriptions} ->
-          state
-
-        {subscription_pid, subscriptions} ->
-          Process.exit(subscription_pid, :kill)
-
-          %State{state |
-            subscriptions: subscriptions,
-          }
+    reply =
+      case SubscriptionsSupervisor.start_subscription(stream, subscription_name, subscriber, start_from) do
+        {:ok, subscription} -> {:ok, subscription}
+        {:error, {:already_started, _}} -> {:error, :subscription_already_exists}
       end
 
-    {:reply, :ok, state}
+    {:reply, reply, state}
   end
 
-  def handle_info({:DOWN, _ref, :process, pid, _reason}, %State{subscriptions: subscriptions} = state) do
-    state = %State{state |
-      subscriptions: remove_subscription_by_pid(subscriptions, pid),
-    }
+  def handle_call({:unsubscribe_all, subscription_name}, _from, %State{} = state) do
+    result = SubscriptionsSupervisor.stop_subscription(subscription_name)
 
-    {:noreply, state}
+    {:reply, result, state}
   end
 
   defp execute_stream_forward(stream, start_version, read_batch_size) do
@@ -193,13 +166,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
       end,
       fn(_) -> :ok end
     )
-  end
-
-  defp remove_subscription_by_pid(subscriptions, pid) do
-    Enum.reduce(subscriptions, subscriptions, fn
-      ({name, subscription}, acc) when subscription == pid -> Map.delete(acc, name)
-      (_, acc) -> acc
-    end)
   end
 
   defp prefix(suffix), do: @stream_prefix <> "-" <> suffix
