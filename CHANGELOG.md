@@ -1,5 +1,15 @@
 # Changelog
 
+## Next release
+
+### Enhancements
+
+- Add support for transient Event Store subscriptions ([#9](https://github.com/commanded/commanded-extreme-adapter/pull/9)).
+
+### Bug fixes
+
+- Supervisor for subscription processes ([#8](https://github.com/commanded/commanded-extreme-adapter/pull/8)).
+
 ## v0.4.0
 
 - Include `event_id` in recorded event data.
