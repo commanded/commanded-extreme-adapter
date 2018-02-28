@@ -15,7 +15,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     RecordedEvent,
     SnapshotData,
   }
-  alias Commanded.EventStore.Adapters.Extreme.{Config,Subscription}
+  alias Commanded.EventStore.Adapters.Extreme.{Config,Subscription,SubscriptionsSupervisor}
   alias Commanded.EventStore.TypeProvider
   alias Extreme.Msg, as: ExMsg
   alias Commanded.EventStore.Adapters.Extreme.Config
@@ -23,16 +23,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   @event_store Commanded.EventStore.Adapters.Extreme.EventStore
   @stream_prefix Config.stream_prefix()
   @serializer Config.serializer()
-
-  defmodule State do
-    defstruct [
-      subscriptions: %{},
-    ]
-  end
-
-  def start_link do
-    GenServer.start_link(__MODULE__, %State{}, name: __MODULE__)
-  end
 
   @spec append_to_stream(String.t, non_neg_integer, list(EventData.t)) :: {:ok, stream_version :: non_neg_integer} | {:error, reason :: term}
   def append_to_stream(stream_uuid, expected_version, events) do
@@ -65,7 +55,12 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     | {:error, reason :: term}
   def subscribe_to_all_streams(subscription_name, subscriber, start_from \\ :origin)
   def subscribe_to_all_streams(subscription_name, subscriber, start_from) do
-    GenServer.call(__MODULE__, {:subscribe_all, subscription_name, subscriber, start_from})
+    stream = "$ce-" <> @stream_prefix
+
+    case SubscriptionsSupervisor.start_subscription(stream, subscription_name, subscriber, start_from) do
+      {:ok, subscription} -> {:ok, subscription}
+      {:error, {:already_started, _}} -> {:error, :subscription_already_exists}
+    end
   end
 
   @spec ack_event(pid, RecordedEvent.t) :: :ok
@@ -75,7 +70,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 
   @spec unsubscribe_from_all_streams(String.t) :: :ok
   def unsubscribe_from_all_streams(subscription_name) do
-    GenServer.call(__MODULE__, {:unsubscribe_all, subscription_name})
+    SubscriptionsSupervisor.stop_subscription(subscription_name)
   end
 
   @spec read_snapshot(String.t) :: {:ok, SnapshotData.t} | {:error, :snapshot_not_found}
@@ -129,53 +124,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  def init(%State{} = state), do: {:ok, state}
-
-  def handle_call({:subscribe_all, subscription_name, subscriber, start_from}, _from, %State{subscriptions: subscriptions} = state) do
-    case Map.get(subscriptions, subscription_name) do
-      nil ->
-      	stream = "$ce-" <> @stream_prefix
-
-      	{:ok, subscription} = Subscription.start(stream, subscription_name, subscriber, start_from)
-
-        Process.monitor(subscription)
-
-        state = %State{state |
-          subscriptions: Map.put(subscriptions, subscription_name, subscription),
-        }
-
-      	{:reply, {:ok, subscription}, state}
-
-      _subscriber ->
-	      {:reply, {:error, :subscription_already_exists}, state}
-    end
-  end
-
-  def handle_call({:unsubscribe_all, subscription_name}, _from, %State{subscriptions: subscriptions} = state) do
-    state =
-      case Map.pop(subscriptions, subscription_name) do
-        {nil, _subscriptions} ->
-          state
-
-        {subscription_pid, subscriptions} ->
-          Process.exit(subscription_pid, :kill)
-
-          %State{state |
-            subscriptions: subscriptions,
-          }
-      end
-
-    {:reply, :ok, state}
-  end
-
-  def handle_info({:DOWN, _ref, :process, pid, _reason}, %State{subscriptions: subscriptions} = state) do
-    state = %State{state |
-      subscriptions: remove_subscription_by_pid(subscriptions, pid),
-    }
-
-    {:noreply, state}
-  end
-
   defp execute_stream_forward(stream, start_version, read_batch_size) do
     Stream.resource(
       fn -> {start_version, false} end,
@@ -193,13 +141,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
       end,
       fn(_) -> :ok end
     )
-  end
-
-  defp remove_subscription_by_pid(subscriptions, pid) do
-    Enum.reduce(subscriptions, subscriptions, fn
-      ({name, subscription}, acc) when subscription == pid -> Map.delete(acc, name)
-      (_, acc) -> acc
-    end)
   end
 
   defp prefix(suffix), do: @stream_prefix <> "-" <> suffix
