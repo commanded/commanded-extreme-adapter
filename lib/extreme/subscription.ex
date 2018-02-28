@@ -31,13 +31,15 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   Start a process to create and connect a persistent connection to the Event Store
   """
   def start_link(stream, subscription_name, subscriber, start_from) do
-    GenServer.start_link(__MODULE__, %State{
+    state = %State{
       stream: stream,
       name: subscription_name,
       subscriber: subscriber,
       start_from: start_from,
       retry_interval: subscription_retry_interval()
-    })
+    }
+
+    GenServer.start_link(__MODULE__, state)
   end
 
   @doc """
