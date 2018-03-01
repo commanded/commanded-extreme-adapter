@@ -1,13 +1,15 @@
-defmodule Commanded.EventStore.Adapters.Extreme.ResetStorage do
+defmodule Commanded.EventStore.Adapters.Extreme.Storage do
   @container_name "commanded-tests-eventstore"
 
-  def execute do
+  def stop do
     Application.stop(:commanded_extreme_adapter)
     Application.stop(:extreme)
+  end
 
+  def reset do
   	:ok = reset_extreme_storage()
 
-  	{:ok, _} = Application.ensure_all_started(:commanded_extreme_adapter)
+  	Application.ensure_all_started(:commanded_extreme_adapter)
 
     :ok
   end
