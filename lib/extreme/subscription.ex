@@ -50,6 +50,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   end
 
   def init(%State{subscriber: subscriber} = state) do
+    Process.link(subscriber)
     state = %State{state |
       subscriber_ref: Process.monitor(subscriber),
     }
