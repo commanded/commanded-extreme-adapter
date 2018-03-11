@@ -1,6 +1,6 @@
 # Changelog
 
-## Next release
+## v0.5.0-rc.0
 
 ### Enhancements
 

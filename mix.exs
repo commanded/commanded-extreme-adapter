@@ -1,10 +1,12 @@
 defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
   use Mix.Project
 
+  @version "0.5.0-rc.0"
+
   def project do
     [
       app: :commanded_extreme_adapter,
-      version: "0.4.0",
+      version: @version,
       elixir: "~> 1.5",
       elixirc_paths: elixirc_paths(Mix.env()),
       description: description(),
@@ -29,14 +31,14 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp deps do
     [
-      {:commanded, github: "commanded/commanded", runtime: false},
+      {:commanded, ">= 0.16.0-rc.0", runtime: false},
       {
         :docker,
         github: "bearice/elixir-docker",
         tag: "03809fc594b9706c106fc28b7ef03c2dbde2fe93",
         only: :test
       },
-      {:extreme, "~> 0.10"},
+      {:extreme, "~> 0.11"},
       {:ex_doc, "~> 0.15", only: :dev},
       {:hackney, "~> 1.8.0", override: true},
       {:httpoison, "~> 0.11.1"},
