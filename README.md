@@ -116,3 +116,4 @@ You should include unit tests to cover any changes. Run `mix test` to execute th
 
 - [Ben Smith](https://github.com/slashdotdash)
 - [Jan Fornoff](https://github.com/jfornoff)
+- [Tim Buchwaldt](https://github.com/timbuchwaldt)

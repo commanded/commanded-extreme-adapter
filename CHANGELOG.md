@@ -1,5 +1,9 @@
 # Changelog
 
+## Next release
+
+- Raise log level of wrong expected version ([#10](https://github.com/commanded/commanded-extreme-adapter/pull/10)).
+
 ## v0.5.0-rc.0
 
 ### Enhancements
