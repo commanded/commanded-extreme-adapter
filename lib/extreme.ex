@@ -215,7 +215,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
         {:ok, response.last_event_number + 1}
 
       {:error, :WrongExpectedVersion, detail} ->
-        Logger.info(fn ->
+        Logger.warn(fn ->
           "Extreme eventstore wrong expected version \"#{expected_version}\" due to: #{
             inspect(detail)
           }"
