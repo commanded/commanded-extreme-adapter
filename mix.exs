@@ -1,7 +1,7 @@
 defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
   use Mix.Project
 
-  @version "0.5.0-rc.0"
+  @version "0.5.0"
 
   def project do
     [
@@ -31,18 +31,20 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp deps do
     [
-      {:commanded, ">= 0.16.0-rc.0", runtime: false},
+      {:commanded, ">= 0.16.0", runtime: false},
+      {:extreme, "~> 0.11"},
+      {:hackney, "~> 1.8.0", override: true},
+      {:httpoison, "~> 0.11.1"},
+
+      # Test & build tooling
       {
         :docker,
         github: "bearice/elixir-docker",
         tag: "03809fc594b9706c106fc28b7ef03c2dbde2fe93",
         only: :test
       },
-      {:extreme, "~> 0.11"},
       {:ex_doc, "~> 0.15", only: :dev},
-      {:hackney, "~> 1.8.0", override: true},
-      {:httpoison, "~> 0.11.1"},
-      {:mix_test_watch, "~> 0.2", only: :dev}
+      {:mix_test_watch, "~> 0.6", only: :dev}
     ]
   end
 
