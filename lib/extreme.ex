@@ -75,17 +75,16 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  @spec subscribe_to_all_streams(String.t(), pid, Commanded.EventStore.start_from()) ::
+  @spec persistent_subscribe(String.t(), String.t(), pid(), Commanded.EventStore.start_from()) ::
           {:ok, subscription :: pid}
           | {:error, :subscription_already_exists}
           | {:error, term}
-  def subscribe_to_all_streams(subscription_name, subscriber, start_from \\ :origin)
 
-  def subscribe_to_all_streams(subscription_name, subscriber, start_from) do
-    stream = "$ce-" <> @stream_prefix
+  def persistent_subscribe(stream_name, subscription_name, subscriber, start_from \\ :origin)
 
+  def persistent_subscribe(stream_name, subscription_name, subscriber, start_from) do
     case SubscriptionsSupervisor.start_subscription(
-           stream,
+           stream_name,
            subscription_name,
            subscriber,
            start_from
@@ -93,6 +92,16 @@ defmodule Commanded.EventStore.Adapters.Extreme do
       {:ok, subscription} -> {:ok, subscription}
       {:error, {:already_started, _}} -> {:error, :subscription_already_exists}
     end
+  end
+
+  @spec subscribe_to_all_streams(String.t(), pid, Commanded.EventStore.start_from()) ::
+          {:ok, subscription :: pid}
+          | {:error, :subscription_already_exists}
+          | {:error, term}
+  def subscribe_to_all_streams(subscription_name, subscriber, start_from \\ :origin)
+
+  def subscribe_to_all_streams(subscription_name, subscriber, start_from) do
+    persistent_subscribe("$ce-" <> @stream_prefix, subscription_name, subscriber, start_from)
   end
 
   @spec ack_event(pid, RecordedEvent.t()) :: :ok
