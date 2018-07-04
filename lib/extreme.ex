@@ -75,16 +75,28 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  @spec subscribe_to_stream(String.t(), String.t(), pid(), Commanded.EventStore.start_from()) ::
+  @spec subscribe_to_stream(
+          String.t(),
+          String.t(),
+          pid(),
+          Commanded.EventStore.start_from(),
+          Keyword.t()
+        ) ::
           {:ok, subscription :: pid}
           | {:error, :subscription_already_exists}
           | {:error, term}
 
-  def subscribe_to_stream(stream_name, subscription_name, subscriber, start_from \\ :origin)
+  def subscribe_to_stream(
+        stream_name,
+        subscription_name,
+        subscriber,
+        start_from \\ :origin,
+        opts \\ [stream_prefix: "$ce-" <> @stream_prefix]
+      )
 
-  def subscribe_to_stream(stream_name, subscription_name, subscriber, start_from) do
+  def subscribe_to_stream(stream_name, subscription_name, subscriber, start_from, opts) do
     case SubscriptionsSupervisor.start_subscription(
-           stream_name,
+           Keyword.get(opts, :stream_prefix, "") <> stream_name,
            subscription_name,
            subscriber,
            start_from
@@ -101,7 +113,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   def subscribe_to_all_streams(subscription_name, subscriber, start_from \\ :origin)
 
   def subscribe_to_all_streams(subscription_name, subscriber, start_from) do
-    subscribe_to_stream("$ce-" <> @stream_prefix, subscription_name, subscriber, start_from)
+    subscribe_to_stream("", subscription_name, subscriber, start_from)
   end
 
   @spec ack_event(pid, RecordedEvent.t()) :: :ok
