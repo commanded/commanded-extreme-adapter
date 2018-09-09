@@ -1,7 +1,7 @@
 defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
   use Mix.Project
 
-  @version "0.5.2"
+  @version "0.5.3"
 
   def project do
     [
@@ -32,7 +32,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
   defp deps do
     [
       {:commanded, ">= 0.16.0", runtime: false},
-      {:extreme, "~> 0.11"},
+      {:extreme, "~> 0.11.0"},
       {:hackney, "~> 1.8.0", override: true},
       {:httpoison, "~> 0.11.1"},
 
