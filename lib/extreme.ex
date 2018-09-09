@@ -81,7 +81,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   def subscribe_to_all_streams(subscription_name, subscriber, start_from \\ :origin)
 
   def subscribe_to_all_streams(subscription_name, subscriber, start_from) do
-    stream = "$all"
+    stream = "$streams"
 
     case SubscriptionsSupervisor.start_subscription(
            stream,
