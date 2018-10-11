@@ -25,7 +25,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Application do
         start:
           {EventPublisher, :start_link, [
             @event_store,
-            "$ce-" <> Config.stream_prefix(),
+            "$streams",
             [name: EventPublisher]
           ]},
         restart: :permanent,

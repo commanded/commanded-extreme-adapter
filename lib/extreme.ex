@@ -26,7 +26,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   alias Extreme.Msg, as: ExMsg
 
   @event_store Commanded.EventStore.Adapters.Extreme.EventStore
-  @stream_prefix Config.stream_prefix()
   @serializer Config.serializer()
 
   @spec append_to_stream(String.t(), non_neg_integer, list(EventData.t())) ::
@@ -82,7 +81,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   def subscribe_to_all_streams(subscription_name, subscriber, start_from \\ :origin)
 
   def subscribe_to_all_streams(subscription_name, subscriber, start_from) do
-    stream = "$ce-" <> @stream_prefix
+    stream = "$streams"
 
     case SubscriptionsSupervisor.start_subscription(
            stream,
@@ -177,11 +176,9 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     )
   end
 
-  defp prefix(suffix), do: @stream_prefix <> "-" <> suffix
+  defp snapshot_stream(source_uuid), do: "snapshot-" <> source_uuid
 
-  defp snapshot_stream(source_uuid), do: @stream_prefix <> "snapshot-" <> source_uuid
-
-  defp stream_name(stream), do: prefix(stream)
+  defp stream_name(stream), do: stream
 
   defp normalize_start_version(0), do: 0
   defp normalize_start_version(start_version), do: start_version - 1
