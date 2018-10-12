@@ -1,41 +1,48 @@
 defmodule Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor do
-  use Supervisor
+  use DynamicSupervisor
+
   require Logger
 
   alias Commanded.EventStore.Adapters.Extreme.Subscription
 
-  def start_link(_args) do
-    Supervisor.start_link(__MODULE__, :ok, name: __MODULE__)
+  def start_link(args) do
+    DynamicSupervisor.start_link(__MODULE__, args, name: __MODULE__)
   end
 
-  def init(:ok) do
-    Supervisor.init([], strategy: :one_for_one)
+  @impl DynamicSupervisor
+  def init(_args) do
+    DynamicSupervisor.init(strategy: :one_for_one)
   end
 
   def start_subscription(stream, subscription_name, subscriber, start_from) do
     spec = subscription_spec(stream, subscription_name, subscriber, start_from)
 
-    case Supervisor.start_child(__MODULE__, spec) do
-      {:error, :already_present} ->
-        :ok = Supervisor.delete_child(__MODULE__, subscription_name)
-        
-        Supervisor.start_child(__MODULE__, spec)
+    case DynamicSupervisor.start_child(__MODULE__, spec) do
+      {:ok, pid} ->
+        {:ok, pid}
 
-      other ->
-        other
+      {:ok, pid, _info} ->
+        {:ok, pid}
+
+      {:error, {:already_started, _pid}} ->
+        {:error, :subscription_already_exists}
+
+      reply ->
+        reply
     end
   end
 
-  def stop_subscription(subscription_name) do
-    Supervisor.terminate_child(__MODULE__, subscription_name)
+  def stop_subscription(subscription) do
+    DynamicSupervisor.terminate_child(__MODULE__, subscription)
   end
 
   defp subscription_spec(stream, subscription_name, subscriber, start_from) do
-    Supervisor.Spec.worker(
-      Subscription,
-      [stream, subscription_name, subscriber, start_from],
+    %{
       id: subscription_name,
-      restart: :transient
-    )
+      start: {Subscription, :start_link, [stream, subscription_name, subscriber, start_from]},
+      restart: :temporary,
+      shutdown: 5_000,
+      type: :worker
+    }
   end
 end
