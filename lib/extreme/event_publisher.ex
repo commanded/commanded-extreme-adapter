@@ -1,13 +1,12 @@
 defmodule Commanded.EventStore.Adapters.Extreme.EventPublisher do
   use Extreme.FanoutListener
 
-  alias Commanded.EventStore.Adapters.Extreme, as: ExtremeAdapter
-  alias Commanded.EventStore.Adapters.Extreme.PubSub
+  alias Commanded.EventStore.Adapters.Extreme.{Mapper, PubSub}
   alias Commanded.EventStore.RecordedEvent
 
   defp process_push(push) do
     push
-    |> ExtremeAdapter.to_recorded_event()
+    |> Mapper.to_recorded_event()
     |> publish()
   end
 

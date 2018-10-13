@@ -3,6 +3,8 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
 
   require Logger
 
+  alias Commanded.EventStore.Adapters.Extreme.Mapper
+  alias Commanded.EventStore.RecordedEvent
   alias Extreme.Msg, as: ExMsg
 
   @event_store Commanded.EventStore.Adapters.Extreme.EventStore
@@ -39,7 +41,10 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
       retry_interval: subscription_retry_interval()
     }
 
-    GenServer.start_link(__MODULE__, state)
+    # Prevent duplicate subscriptions by stream/name
+    name = {:global, {__MODULE__, stream, subscription_name}}
+
+    GenServer.start_link(__MODULE__, state, name: name)
   end
 
   @doc """
@@ -89,25 +94,31 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
 
     event_type = event.event.event_type
 
+    event_id =
+      case event.link do
+        nil -> event.event.event_id
+        link -> link.event_id
+      end
+
     state =
       if "$" != String.first(event_type) do
-        recorded_event = ExtremeAdapter.to_recorded_event(event)
+        %RecordedEvent{event_number: event_number} =
+          recorded_event = Mapper.to_recorded_event(event)
 
         send(subscriber, {:events, [recorded_event]})
 
         %State{
           state
           | last_seen_correlation_id: correlation_id,
-            last_seen_event_id: event.link.event_id,
-            last_seen_event_number: recorded_event.event_number
+            last_seen_event_id: event_id,
+            last_seen_event_number: event_number
         }
       else
         Logger.debug(fn ->
           describe(state) <> " ignoring event of type: #{inspect(event_type)}"
         end)
 
-        :ok =
-          Extreme.PersistentSubscription.ack(subscription, event.link.event_id, correlation_id)
+        :ok = Extreme.PersistentSubscription.ack(subscription, event_id, correlation_id)
 
         state
       end

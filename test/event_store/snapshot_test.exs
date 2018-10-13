@@ -4,10 +4,6 @@ defmodule Commanded.EventStore.Adapters.Extreme.SnapshotTest do
   alias Commanded.EventStore.Adapters.Extreme.Storage
 
   setup do
-    on_exit(fn ->
-      Storage.reset!()
-    end)
-
-    :ok
+    Storage.reset!()
   end
 end

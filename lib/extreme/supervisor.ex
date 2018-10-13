@@ -28,7 +28,6 @@ defmodule Commanded.EventStore.Adapters.Extreme.Supervisor do
         shutdown: 5000,
         type: :worker
       },
-      # {EventPublisher, @event_store, all_stream, [name: EventPublisher]},
       %{
         id: EventPublisher,
         start:

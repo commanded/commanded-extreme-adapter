@@ -1,6 +1,6 @@
 %{
   "certifi": {:hex, :certifi, "2.4.2", "75424ff0f3baaccfd34b1214184b6ef616d89e420b258bb0a5ea7d7bc628f7f0", [:rebar3], [{:parse_trans, "~>3.3", [hex: :parse_trans, repo: "hexpm", optional: false]}], "hexpm"},
-  "commanded": {:git, "https://github.com/commanded/commanded.git", "0fd3758e5945f2bd8736619c48f212cc2bf552ad", [branch: "master"]},
+  "commanded": {:git, "https://github.com/commanded/commanded.git", "50cd809830e82b535ce610c2baebc02d3ea13cfe", [branch: "master"]},
   "docker": {:git, "https://github.com/bearice/elixir-docker.git", "03809fc594b9706c106fc28b7ef03c2dbde2fe93", [tag: "03809fc594b9706c106fc28b7ef03c2dbde2fe93"]},
   "earmark": {:hex, :earmark, "1.2.6", "b6da42b3831458d3ecc57314dff3051b080b9b2be88c2e5aa41cd642a5b044ed", [:mix], [], "hexpm"},
   "elixir_uuid": {:hex, :elixir_uuid, "1.2.0", "ff26e938f95830b1db152cb6e594d711c10c02c6391236900ddd070a6b01271d", [:mix], [], "hexpm"},

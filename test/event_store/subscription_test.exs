@@ -4,12 +4,8 @@ defmodule Commanded.EventStore.Adapters.Extreme.SubscriptionTest do
   alias Commanded.EventStore.Adapters.Extreme.Storage
 
   setup do
-    on_exit(fn ->
-      Storage.reset!()
-    end)
-
-    :ok
+    Storage.reset!()
   end
 
-  defp event_store_wait(_default \\ nil), do: 1_000
+  defp event_store_wait(_default \\ nil), do: 10_000
 end
