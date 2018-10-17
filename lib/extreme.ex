@@ -29,6 +29,9 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   @stream_prefix Config.stream_prefix()
   @serializer Config.serializer()
 
+  @spec child_spec() :: [:supervisor.child_spec()]
+  def child_spec, do: []
+
   @spec append_to_stream(String.t(), non_neg_integer, list(EventData.t())) ::
           {:ok, stream_version :: non_neg_integer}
           | {:error, :wrong_expected_version}
@@ -40,7 +43,10 @@ defmodule Commanded.EventStore.Adapters.Extreme do
       "Extreme event store attempting to append to stream \"#{stream}\" #{inspect(length(events))} event(s)"
     end)
 
-    add_to_stream(stream, expected_version, events)
+    case add_to_stream(stream, expected_version, events) do
+      {:ok, _} -> :ok
+      err -> err
+    end
   end
 
   @spec stream_forward(String.t(), non_neg_integer, non_neg_integer) ::
@@ -75,17 +81,14 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  @spec subscribe_to_all_streams(String.t(), pid, Commanded.EventStore.start_from()) ::
-          {:ok, subscription :: pid}
-          | {:error, :subscription_already_exists}
-          | {:error, term}
-  def subscribe_to_all_streams(subscription_name, subscriber, start_from \\ :origin)
-
-  def subscribe_to_all_streams(subscription_name, subscriber, start_from) do
+  def subscribe_to(:all, subscription_name, subscriber, start_from) do
     stream = "$ce-" <> @stream_prefix
+    subscribe_to(stream, subscription_name, subscriber, start_from)
+  end
 
+  def subscribe_to(stream_uuid, subscription_name, subscriber, start_from) do
     case SubscriptionsSupervisor.start_subscription(
-           stream,
+           stream_uuid,
            subscription_name,
            subscriber,
            start_from
@@ -100,8 +103,8 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     Subscription.ack(subscription, event_number)
   end
 
-  @spec unsubscribe_from_all_streams(String.t()) :: :ok
-  def unsubscribe_from_all_streams(subscription_name) do
+  @spec unsubscribe(String.t()) :: :ok
+  def unsubscribe(subscription_name) do
     SubscriptionsSupervisor.stop_subscription(subscription_name)
   end
 
