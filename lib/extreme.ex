@@ -72,7 +72,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  @spec subscribe(String.t()) :: :ok | {:error, term}
+  @spec subscribe(String.t() | :all) :: :ok | {:error, term}
   def subscribe(stream_uuid) do
     with {:ok, _} <- Registry.register(PubSub, stream_uuid, []) do
       :ok
