@@ -8,43 +8,40 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 
   require Logger
 
-  alias Commanded.EventStore.{
-    EventData,
-    RecordedEvent,
-    SnapshotData
-  }
+  alias Commanded.EventStore.{EventData, RecordedEvent, SnapshotData, TypeProvider}
 
   alias Commanded.EventStore.Adapters.Extreme.{
     Config,
+    Mapper,
     PubSub,
     Subscription,
     SubscriptionsSupervisor
   }
 
-  alias Commanded.EventStore.TypeProvider
-
   alias Extreme.Msg, as: ExMsg
 
   @event_store Commanded.EventStore.Adapters.Extreme.EventStore
-  @stream_prefix Config.stream_prefix()
-  @serializer Config.serializer()
 
-  @spec append_to_stream(String.t(), non_neg_integer, list(EventData.t())) ::
-          {:ok, stream_version :: non_neg_integer}
-          | {:error, :wrong_expected_version}
-          | {:error, term}
+  @impl Commanded.EventStore
+  def child_spec do
+    [
+      Commanded.EventStore.Adapters.Extreme.Supervisor
+    ]
+  end
+
+  @impl Commanded.EventStore
   def append_to_stream(stream_uuid, expected_version, events) do
     stream = stream_name(stream_uuid)
 
     Logger.debug(fn ->
-      "Extreme event store attempting to append to stream \"#{stream}\" #{inspect(length(events))} event(s)"
+      "Extreme event store attempting to append to stream " <>
+        inspect(stream) <> " " <> inspect(length(events)) <> " event(s)"
     end)
 
     add_to_stream(stream, expected_version, events)
   end
 
-  @spec stream_forward(String.t(), non_neg_integer, non_neg_integer) ::
-          Enumerable.t() | {:error, :stream_not_found} | {:error, term}
+  @impl Commanded.EventStore
   def stream_forward(stream_uuid, start_version \\ 0, read_batch_size \\ 1_000)
 
   def stream_forward(stream_uuid, start_version, read_batch_size) do
@@ -66,7 +63,11 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  @spec subscribe(String.t()) :: :ok | {:error, term}
+  @impl Commanded.EventStore
+  def subscribe(stream_uuid)
+
+  def subscribe(:all), do: subscribe("$all")
+
   def subscribe(stream_uuid) do
     with {:ok, _} <- Registry.register(PubSub, stream_uuid, []) do
       :ok
@@ -75,61 +76,56 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  @spec subscribe_to_all_streams(String.t(), pid, Commanded.EventStore.start_from()) ::
-          {:ok, subscription :: pid}
-          | {:error, :subscription_already_exists}
-          | {:error, term}
-  def subscribe_to_all_streams(subscription_name, subscriber, start_from \\ :origin)
+  @impl Commanded.EventStore
+  def subscribe_to(stream_uuid, subscription_name, subscriber, start_from \\ :origin)
 
-  def subscribe_to_all_streams(subscription_name, subscriber, start_from) do
-    stream = "$ce-" <> @stream_prefix
+  def subscribe_to(:all, subscription_name, subscriber, start_from) do
+    stream = Config.all_stream()
 
-    case SubscriptionsSupervisor.start_subscription(
-           stream,
-           subscription_name,
-           subscriber,
-           start_from
-         ) do
-      {:ok, subscription} -> {:ok, subscription}
-      {:error, {:already_started, _}} -> {:error, :subscription_already_exists}
-    end
+    SubscriptionsSupervisor.start_subscription(stream, subscription_name, subscriber, start_from)
   end
 
-  @spec ack_event(pid, RecordedEvent.t()) :: :ok
+  def subscribe_to(stream_uuid, subscription_name, subscriber, start_from) do
+    stream = stream_name(stream_uuid)
+
+    SubscriptionsSupervisor.start_subscription(stream, subscription_name, subscriber, start_from)
+  end
+
+  @impl Commanded.EventStore
   def ack_event(subscription, %RecordedEvent{event_number: event_number}) do
     Subscription.ack(subscription, event_number)
   end
 
-  @spec unsubscribe_from_all_streams(String.t()) :: :ok
-  def unsubscribe_from_all_streams(subscription_name) do
-    SubscriptionsSupervisor.stop_subscription(subscription_name)
+  @impl Commanded.EventStore
+  def unsubscribe(subscription) do
+    SubscriptionsSupervisor.stop_subscription(subscription)
   end
 
-  @spec read_snapshot(String.t()) :: {:ok, SnapshotData.t()} | {:error, :snapshot_not_found}
+  @impl Commanded.EventStore
   def read_snapshot(source_uuid) do
     stream = snapshot_stream(source_uuid)
 
-    Logger.debug(fn -> "Extreme event store read snapshot from stream: #{inspect(stream)}" end)
+    Logger.debug(fn -> "Extreme event store read snapshot from stream: " <> inspect(stream) end)
 
-    case read_backward(stream, -1, 1) do
-      {:ok, [recorded_event]} ->
+    case execute_read(stream, -1, 1, :backward) do
+      {:ok, [recorded_event], _end_of_stream?} ->
         {:ok, to_snapshot_data(recorded_event)}
 
       {:error, :stream_not_found} ->
         {:error, :snapshot_not_found}
 
       err ->
-        Logger.error(fn -> "Extreme event store error reading snapshot: #{inspect(err)}" end)
+        Logger.error(fn -> "Extreme event store error reading snapshot: " <> inspect(err) end)
         err
     end
   end
 
-  @spec record_snapshot(SnapshotData.t()) :: :ok | {:error, term}
+  @impl Commanded.EventStore
   def record_snapshot(%SnapshotData{} = snapshot) do
     event_data = to_event_data(snapshot)
     stream = snapshot_stream(snapshot.source_uuid)
 
-    Logger.debug(fn -> "Extreme event store record snapshot to stream: #{inspect(stream)}" end)
+    Logger.debug(fn -> "Extreme event store record snapshot to stream: " <> inspect(stream) end)
 
     case add_to_stream(stream, :any_version, [event_data]) do
       {:ok, _} -> :ok
@@ -137,7 +133,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  @spec delete_snapshot(String.t()) :: :ok | {:error, term}
+  @impl Commanded.EventStore
   def delete_snapshot(source_uuid) do
     stream = snapshot_stream(source_uuid)
 
@@ -177,9 +173,9 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     )
   end
 
-  defp prefix(suffix), do: @stream_prefix <> "-" <> suffix
+  defp prefix(suffix), do: Config.stream_prefix() <> "-" <> suffix
 
-  defp snapshot_stream(source_uuid), do: @stream_prefix <> "snapshot-" <> source_uuid
+  defp snapshot_stream(source_uuid), do: Config.stream_prefix() <> "snapshot-" <> source_uuid
 
   defp stream_name(stream), do: prefix(stream)
 
@@ -209,22 +205,40 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     }
   end
 
+  defp add_to_stream(stream, :stream_exists, events) do
+    case execute_read(stream, 0, 1, :forward) do
+      {:ok, _events, _end_of_stream?} ->
+        add_to_stream(stream, :any_version, events)
+
+      {:error, :stream_not_found} ->
+        {:error, :stream_does_not_exist}
+
+      {:error, _error} = reply ->
+        reply
+    end
+  end
+
   defp add_to_stream(stream, expected_version, events) do
-    case Extreme.execute(@event_store, write_events(stream, expected_version, events)) do
-      {:ok, response} ->
-        {:ok, response.last_event_number + 1}
+    msg = write_events(stream, expected_version, events)
+
+    case Extreme.execute(@event_store, msg) do
+      {:ok, _response} ->
+        :ok
 
       {:error, :WrongExpectedVersion, detail} ->
         Logger.warn(fn ->
-          "Extreme eventstore wrong expected version \"#{expected_version}\" due to: #{
-            inspect(detail)
-          }"
+          "Extreme event store wrong expected version " <>
+            inspect(expected_version) <> " due to: " <> inspect(detail)
         end)
 
-        {:error, :wrong_expected_version}
+        case expected_version do
+          :no_stream -> {:error, :stream_exists}
+          :stream_exists -> {:error, :stream_does_not_exist}
+          _ -> {:error, :wrong_expected_version}
+        end
 
-      err ->
-        err
+      reply ->
+        reply
     end
   end
 
@@ -235,17 +249,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
       require_master: false,
       hard_delete: hard_delete
     )
-  end
-
-  defp read_backward(stream, start_version, count) do
-    execute_read!(stream, start_version, count, :backward)
-  end
-
-  defp execute_read!(stream, start_version, count, direction) do
-    case execute_read(stream, start_version, count, direction) do
-      {:ok, events, _} -> {:ok, events}
-      err -> err
-    end
   end
 
   defp execute_read(stream, start_version, count, direction, read_events \\ []) do
@@ -262,7 +265,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
         read_events = read_events ++ events
 
         if end_of_stream? || length(read_events) == count do
-          recorded_events = Enum.map(read_events, &to_recorded_event/1)
+          recorded_events = Enum.map(read_events, &Mapper.to_recorded_event/1)
 
           {:ok, recorded_events, end_of_stream?}
         else
@@ -284,68 +287,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  def to_recorded_event(%ExMsg.ResolvedIndexedEvent{event: event, link: nil}),
-    do: to_recorded_event(event, event.event_number + 1)
-
-  def to_recorded_event(%ExMsg.ResolvedIndexedEvent{event: event, link: link}),
-    do: to_recorded_event(event, link.event_number + 1)
-
-  def to_recorded_event(%ExMsg.ResolvedEvent{event: event}),
-    do: to_recorded_event(event, event.event_number + 1)
-
-  def to_recorded_event(%ExMsg.EventRecord{} = event),
-    do: to_recorded_event(event, event.event_number + 1)
-
-  def to_recorded_event(%ExMsg.EventRecord{} = event, event_number) do
-    %ExMsg.EventRecord{
-      event_id: event_id,
-      event_type: event_type,
-      created_epoch: created_epoch,
-      data: data,
-      metadata: metadata
-    } = event
-
-    data = deserialize(data, type: event_type)
-
-    metadata =
-      case metadata do
-        none when none in [nil, ""] -> %{}
-        metadata -> deserialize(metadata)
-      end
-
-    {causation_id, metadata} = Map.pop(metadata, "$causationId")
-    {correlation_id, metadata} = Map.pop(metadata, "$correlationId")
-
-    %RecordedEvent{
-      event_id: UUID.binary_to_string!(event_id),
-      event_number: event_number,
-      stream_id: to_stream_id(event),
-      stream_version: event_number,
-      causation_id: causation_id,
-      correlation_id: correlation_id,
-      event_type: event_type,
-      data: data,
-      metadata: metadata,
-      created_at: to_naive_date_time(created_epoch)
-    }
-  end
-
-  defp to_stream_id(%ExMsg.EventRecord{event_stream_id: event_stream_id}) do
-    event_stream_id
-    |> String.split("-")
-    |> Enum.drop(1)
-    |> Enum.join("-")
-  end
-
-  defp to_naive_date_time(millis_since_epoch) do
-    secs_since_epoch = round(Float.floor(millis_since_epoch / 1000))
-    millis = :erlang.rem(millis_since_epoch, 1000)
-    epoch_secs = :calendar.datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}})
-    erl_date = :calendar.gregorian_seconds_to_datetime(epoch_secs + secs_since_epoch)
-
-    NaiveDateTime.from_erl!(erl_date, {millis * 1000, 3})
-  end
-
   defp read_events(stream, from_event_number, max_count, direction) do
     msg_type =
       if :forward == direction, do: ExMsg.ReadStreamEvents, else: ExMsg.ReadStreamEventsBackward
@@ -358,10 +299,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
       require_master: false
     )
   end
-
-  defp serialize(data), do: @serializer.serialize(data)
-
-  defp deserialize(data, opts \\ []), do: @serializer.deserialize(data, opts)
 
   defp add_causation_id(metadata, causation_id),
     do: add_to_metadata(metadata, "$causationId", causation_id)
@@ -377,11 +314,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   defp add_to_metadata(metadata, key, value), do: Map.put(metadata, key, value)
 
   defp write_events(stream_id, expected_version, events) do
-    expected_version =
-      case expected_version do
-        :any_version -> -2
-        _ -> expected_version - 1
-      end
+    expected_version = expected_version(expected_version)
 
     proto_events =
       Enum.map(events, fn event ->
@@ -407,4 +340,19 @@ defmodule Commanded.EventStore.Adapters.Extreme do
       require_master: false
     )
   end
+
+  def serialize(data), do: Config.serializer().serialize(data)
+
+  # Event store supports the following special values for expected version:
+  #
+  #  -2 states that this write should never conflict and should always succeed.
+  #  -1 states that the stream should not exist at the time of the writing.
+  #  0 states that the stream should exist but should be empty.
+  #
+  #  Any other integer value represents the version of the stream you expect.
+  #
+  defp expected_version(:any_version), do: -2
+  defp expected_version(:no_stream), do: -1
+  defp expected_version(:stream_exists), do: 0
+  defp expected_version(expected_version), do: expected_version - 1
 end

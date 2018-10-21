@@ -35,8 +35,7 @@ The package can be installed from hex as follows.
 2. Configure Commanded to use the event store adapter:
 
     ```elixir
-    config :commanded,
-      event_store_adapter: Commanded.EventStore.Adapters.Extreme
+    config :commanded, event_store_adapter: Commanded.EventStore.Adapters.Extreme
     ```
 
 3. Configure the `extreme` library connection with your Event Store connection details:
