@@ -68,13 +68,7 @@ You **must** run the Event Store with all projections enabled and standard proje
 
 The test suite uses Docker to run the official [Event Store](https://store.docker.com/community/images/eventstore/eventstore) container.
 
-You will need to install Docker. For Mac uses, you may also need to install `socat` to expose the Docker API via a TCP port from its default Unix socket.
-
-```
-socat TCP-LISTEN:2375,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock
-```
-
-### Getting started
+You will need to install Docker.
 
 Pull the docker image:
 
@@ -82,10 +76,21 @@ Pull the docker image:
 docker pull eventstore/eventstore:release-3.9.3
 ```
 
-Run the container using:
+For Mac users, you may also need to install `socat` to expose the Docker API via a TCP port from its default Unix socket.
 
 ```
-docker run --name eventstore-node -it -p 2113:2113 -p 1113:1113 eventstore/eventstore
+brew install socat
+socat TCP-LISTEN:2375,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock
+```
+
+Run `mix test`, it will automatically run Docker container with Event Store and restart it between tests.
+
+### Run Event Store manually
+
+You can run the container manually using:
+
+```
+docker run -it -p 2113:2113 -p 1113:1113 eventstore/eventstore:release-3.9.3
 ```
 
 Note: The admin UI and atom feeds will only work if you publish the node's http port to a matching port on the host. (i.e. you need to run the container with -p 2113:2113).
