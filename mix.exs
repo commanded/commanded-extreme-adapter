@@ -33,9 +33,8 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
     [
       # @todo Lock to the next version of commanded when it is released
       {:commanded, github: "commanded/commanded", runtime: false},
-      {:extreme, "~> 0.11"},
-      {:hackney, "~> 1.8.0", override: true},
-      {:httpoison, "~> 0.11.1"},
+      {:extreme, "~> 0.13"},
+      {:hackney, "~> 1.14", override: true},
 
       # Test & build tooling
       {
