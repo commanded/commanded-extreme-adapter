@@ -79,7 +79,7 @@ socat TCP-LISTEN:2375,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock
 Pull the docker image:
 
 ```
-docker pull eventstore/eventstore
+docker pull eventstore/eventstore:release-3.9.3
 ```
 
 Run the container using:
