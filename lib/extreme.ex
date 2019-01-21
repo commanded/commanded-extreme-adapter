@@ -186,16 +186,10 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     data =
       snapshot.source_type
       |> String.to_existing_atom()
-      |> struct(with_atom_keys(snapshot.data))
+      |> struct(snapshot.data)
       |> Commanded.Serialization.JsonDecoder.decode()
 
     %SnapshotData{snapshot | data: data, created_at: event.created_at}
-  end
-
-  defp with_atom_keys(map) do
-    Enum.reduce(Map.keys(map), %{}, fn key, m ->
-      Map.put(m, String.to_existing_atom(key), Map.get(map, key))
-    end)
   end
 
   defp to_event_data(%SnapshotData{} = snapshot) do
