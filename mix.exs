@@ -9,6 +9,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
       version: @version,
       elixir: "~> 1.6",
       elixirc_paths: elixirc_paths(Mix.env()),
+      consolidate_protocols: Mix.env() != :test,
       description: description(),
       package: package(),
       build_embedded: Mix.env() == :prod,
@@ -19,9 +20,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   def application do
     [
-      extra_applications: [
-        :logger
-      ]
+      extra_applications: [:logger]
     ]
   end
 
@@ -37,11 +36,13 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp deps do
     [
-      # {:commanded, ">= 0.16.0", runtime: false},
       {:commanded, github: "commanded/commanded", branch: "master", runtime: Mix.env() == :test},
-      {:extreme, "~> 0.13.3"},
-      {:hackney, "~> 1.14", override: true},
+      {:extreme, "~> 0.13"},
+      {:hackney, "~> 1.15", override: true},
       {:httpoison, "~> 1.2 or ~> 1.3"},
+
+      # Optional dependencies
+      {:jason, "~> 1.1", optional: true},
 
       # Test & build tooling
       {
