@@ -8,7 +8,7 @@ Use Greg Young's [Event Store](https://geteventstore.com/) with [Commanded](http
 
 MIT License
 
-[![Build Status](https://travis-ci.org/commanded/commanded-extreme-adapter.svg?branch=master)](https://travis-ci.org/commanded/commanded-extreme-adapter)
+[![Build Status](https://travis-ci.com/commanded/commanded-extreme-adapter.svg?branch=master)](https://travis-ci.com/commanded/commanded-extreme-adapter)
 
 ---
 
