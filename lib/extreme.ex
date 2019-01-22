@@ -102,6 +102,20 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   @impl Commanded.EventStore
+  def delete_subscription(:all, subscription_name) do
+    stream = Config.all_stream()
+
+    delete_persistent_subscription(stream, subscription_name)
+  end
+
+  @impl Commanded.EventStore
+  def delete_subscription(stream_uuid, subscription_name) do
+    stream = stream_name(stream_uuid)
+
+    delete_persistent_subscription(stream_uuid, subscription_name)
+  end
+
+  @impl Commanded.EventStore
   def read_snapshot(source_uuid) do
     stream = snapshot_stream(source_uuid)
 
@@ -335,7 +349,38 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     )
   end
 
-  def serialize(data), do: Config.serializer().serialize(data)
+  defp delete_persistent_subscription(stream, name) do
+    Logger.debug(fn ->
+      "Attempting to delete persistent subscription named #{inspect(name)} on stream #{
+        inspect(stream)
+      }"
+    end)
+
+    message =
+      ExMsg.DeletePersistentSubscription.new(
+        subscription_group_name: name,
+        event_stream_id: stream
+      )
+
+    case Extreme.execute(@event_store, message) do
+      {:ok, %ExMsg.DeletePersistentSubscriptionCompleted{result: :Success}} ->
+        :ok
+
+      {:error, :DoesNotExist, %ExMsg.DeletePersistentSubscriptionCompleted{}} ->
+        {:error, :subscription_not_found}
+
+      {:error, :Fail, %ExMsg.DeletePersistentSubscriptionCompleted{}} ->
+        {:error, :failed_to_delete}
+
+      {:error, :AccessDenied, %ExMsg.DeletePersistentSubscriptionCompleted{}} ->
+        {:error, :access_denied}
+
+      reply ->
+        reply
+    end
+  end
+
+  defp serialize(data), do: Config.serializer().serialize(data)
 
   # Event store supports the following special values for expected version:
   #
