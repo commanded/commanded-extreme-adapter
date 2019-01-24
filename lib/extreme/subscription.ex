@@ -101,7 +101,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
       end
 
     state =
-      if "$" != String.first(event_type) do
+      if event_type != nil and "$" != String.first(event_type) do
         %RecordedEvent{event_number: event_number} =
           recorded_event = Mapper.to_recorded_event(event)
 
