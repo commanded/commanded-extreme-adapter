@@ -1,5 +1,11 @@
 # Changelog
 
+## Next release
+
+### Bug fixes
+
+- Skip deleted events instead of crashing ([#22](https://github.com/commanded/commanded-extreme-adapter/pull/22)).
+
 ## v0.6.0
 
 ### Enhancements
