@@ -1,7 +1,7 @@
 defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
   use Mix.Project
 
-  @version "0.6.0"
+  @version "0.7.0"
 
   def project do
     [
@@ -53,7 +53,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
       },
       {:ex_doc, "~> 0.19", only: :dev},
       {:mix_test_watch, "~> 0.9", only: :dev},
-      {:mox, "~> 0.4", only: :test}
+      {:mox, "~> 0.5", only: :test}
     ]
   end
 
