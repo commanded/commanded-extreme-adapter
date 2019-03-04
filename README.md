@@ -65,13 +65,7 @@ You **must** run the Event Store with all projections enabled and standard proje
 
 ## Testing
 
-The test suite uses Docker to run the official [Event Store](https://store.docker.com/community/images/eventstore/eventstore) container.
-
-You will need to install Docker. For Mac uses, you may also need to install `socat` to expose the Docker API via a TCP port from its default Unix socket.
-
-```
-socat TCP-LISTEN:2375,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock
-```
+The test suite uses Docker to run the official [Event Store](https://store.docker.com/community/images/eventstore/eventstore) container. You must pull the docker image and start the container *before* running the test suite.
 
 ### Getting started
 
@@ -84,7 +78,10 @@ docker pull eventstore/eventstore
 Run the container using:
 
 ```
-docker run --name eventstore-node -it -p 2113:2113 -p 1113:1113 eventstore/eventstore
+docker run --name eventstore -it -p 2113:2113 -p 1113:1113 \
+  -e EVENTSTORE_START_STANDARD_PROJECTIONS=True \
+  -e EVENTSTORE_RUN_PROJECTIONS=all \
+  eventstore/eventstore
 ```
 
 Note: The admin UI and atom feeds will only work if you publish the node's http port to a matching port on the host. (i.e. you need to run the container with -p 2113:2113).

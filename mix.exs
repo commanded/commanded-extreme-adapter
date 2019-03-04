@@ -38,19 +38,12 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
     [
       {:commanded, "~> 0.18", runtime: Mix.env() == :test},
       {:extreme, "~> 0.13"},
-      {:hackney, "~> 1.15", override: true},
       {:httpoison, "~> 1.2 or ~> 1.3"},
 
       # Optional dependencies
       {:jason, "~> 1.1", optional: true},
 
       # Test & build tooling
-      {
-        :docker,
-        github: "bearice/elixir-docker",
-        tag: "03809fc594b9706c106fc28b7ef03c2dbde2fe93",
-        only: :test
-      },
       {:ex_doc, "~> 0.19", only: :dev},
       {:mix_test_watch, "~> 0.9", only: :dev},
       {:mox, "~> 0.5", only: :test}

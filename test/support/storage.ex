@@ -4,49 +4,16 @@ defmodule Commanded.EventStore.Adapters.Extreme.Storage do
   def reset! do
     Application.stop(:commanded)
 
-    :ok = reset_extreme_storage()
+    stream_prefix = "commandedtest#{String.replace(UUID.uuid4(), "-", "")}"
 
-    Application.ensure_all_started(:commanded)
+    Application.put_env(:commanded_extreme_adapter, :stream_prefix, stream_prefix)
+
+    {:ok, _} = Application.ensure_all_started(:commanded)
 
     :ok
   end
 
-  defp reset_extreme_storage do
-    {:ok, conn} =
-      Docker.start_link(%{
-        baseUrl: "http://localhost:2375",
-        ssl_options: [
-          {:certfile, 'docker.crt'},
-          {:keyfile, 'docker.key'}
-        ]
-      })
-
-    Docker.Container.kill(conn, @container_name)
-    Docker.Container.delete(conn, @container_name)
-
-    Docker.Container.create(conn, @container_name, %{
-      Image: "eventstore/eventstore",
-      ExposedPorts: %{
-        "2113/tcp" => %{},
-        "1113/tcp" => %{}
-      },
-      PortBindings: %{
-        "1113/tcp": [%{"HostPort" => "1113"}],
-        "2113/tcp": [%{"HostPort" => "2113"}]
-      },
-      Env: [
-        "EVENTSTORE_DB=/tmp/db",
-        "EVENTSTORE_RUN_PROJECTIONS=All",
-        "EVENTSTORE_START_STANDARD_PROJECTIONS=True"
-      ]
-    })
-
-    Docker.Container.start(conn, @container_name)
-
-    wait_for_event_store()
-  end
-
-  defp wait_for_event_store do
+  def wait_for_event_store do
     headers = [Accept: "application/vnd.eventstore.atom+json"]
     options = [recv_timeout: 400]
 
