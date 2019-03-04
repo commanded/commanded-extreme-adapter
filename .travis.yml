@@ -11,6 +11,6 @@ sudo: required
 services:
   - docker
 
-before_script:
+before_install:
   - docker pull eventstore/eventstore
-  - docker run -it -p 2113:2113 -p 1113:1113 -e EVENTSTORE_START_STANDARD_PROJECTIONS=True -e EVENTSTORE_RUN_PROJECTIONS=all eventstore/eventstore
+  - docker run -d --rm -p 2113:2113 -p 1113:1113 -e EVENTSTORE_START_STANDARD_PROJECTIONS=True -e EVENTSTORE_RUN_PROJECTIONS=all eventstore/eventstore
