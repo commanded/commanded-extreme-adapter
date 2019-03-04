@@ -1,6 +1,4 @@
 defmodule Commanded.EventStore.Adapters.Extreme.Storage do
-  @container_name "commanded-tests-eventstore"
-
   def reset! do
     Application.stop(:commanded)
 
