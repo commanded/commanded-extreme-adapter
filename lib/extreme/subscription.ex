@@ -49,16 +49,11 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   end
 
   @doc """
-  Acknowledge receipt and successful processing of the given event
+  Acknowledge receipt and successful processing of the given event.
   """
   def ack(subscription, event_number) do
-    GenServer.cast(subscription, {:ack, event_number})
+    GenServer.call(subscription, {:ack, event_number})
   end
-
-  @doc """
-  Get the subscriber PID associated with this subscription.
-  """
-  def subscriber(subscription), do: GenServer.call(subscription, :subscriber)
 
   @impl GenServer
   def init(%State{} = state) do
@@ -72,14 +67,11 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   end
 
   @impl GenServer
-  def handle_call(:subscriber, _from, state) do
-    %State{subscriber: subscriber} = state
-
-    {:reply, subscriber, state}
-  end
-
-  @impl GenServer
-  def handle_cast({:ack, event_number}, %State{last_seen_event_number: event_number} = state) do
+  def handle_call(
+        {:ack, event_number},
+        _from,
+        %State{last_seen_event_number: event_number} = state
+      ) do
     %State{
       subscription: subscription,
       last_seen_correlation_id: correlation_id,
@@ -92,7 +84,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
 
     state = %State{state | last_seen_event_id: nil, last_seen_event_number: nil}
 
-    {:noreply, state}
+    {:reply, :ok, state}
   end
 
   @impl GenServer

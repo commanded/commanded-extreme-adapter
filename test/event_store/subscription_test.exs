@@ -7,5 +7,5 @@ defmodule Commanded.EventStore.Adapters.Extreme.SubscriptionTest do
     Storage.reset!()
   end
 
-  defp event_store_wait(_default \\ nil), do: 10_000
+  defp event_store_wait(_default \\ nil), do: 5_000
 end
