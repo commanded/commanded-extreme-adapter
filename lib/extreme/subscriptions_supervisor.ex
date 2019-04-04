@@ -14,8 +14,8 @@ defmodule Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor do
     DynamicSupervisor.init(strategy: :one_for_one)
   end
 
-  def start_subscription(stream, subscription_name, subscriber, start_from) do
-    spec = subscription_spec(stream, subscription_name, subscriber, start_from)
+  def start_subscription(stream, subscription_name, subscriber, opts, index \\ 0) do
+    spec = subscription_spec(stream, subscription_name, subscriber, opts, index)
 
     case DynamicSupervisor.start_child(__MODULE__, spec) do
       {:ok, pid} ->
@@ -25,7 +25,13 @@ defmodule Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor do
         {:ok, pid}
 
       {:error, {:already_started, _pid}} ->
-        {:error, :subscription_already_exists}
+        subscriber_max_count = Keyword.get(opts, :subscriber_max_count, 1)
+
+        if index < subscriber_max_count - 1 do
+          start_subscription(stream, subscription_name, subscriber, opts, index + 1)
+        else
+          {:error, :too_many_subscribers}
+        end
 
       reply ->
         reply
@@ -36,10 +42,17 @@ defmodule Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor do
     DynamicSupervisor.terminate_child(__MODULE__, subscription)
   end
 
-  defp subscription_spec(stream, subscription_name, subscriber, start_from) do
+  defp subscription_spec(stream, subscription_name, subscriber, opts, index) do
+    start_args = [
+      stream,
+      subscription_name,
+      subscriber,
+      Keyword.put(opts, :index, index)
+    ]
+
     %{
-      id: subscription_name,
-      start: {Subscription, :start_link, [stream, subscription_name, subscriber, start_from]},
+      id: {Subscription, stream, subscription_name, index},
+      start: {Subscription, :start_link, start_args},
       restart: :temporary,
       shutdown: 5_000,
       type: :worker

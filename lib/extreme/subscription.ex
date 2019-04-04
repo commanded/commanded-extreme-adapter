@@ -18,6 +18,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
       :retry_interval,
       :stream,
       :start_from,
+      :subscriber_max_count,
       :subscriber,
       :subscriber_ref,
       :subscription,
@@ -26,23 +27,23 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     ]
   end
 
-  alias Commanded.EventStore.Adapters.Extreme, as: ExtremeAdapter
   alias Commanded.EventStore.Adapters.Extreme.Subscription.State
 
   @doc """
   Start a process to create and connect a persistent connection to the Event Store
   """
-  def start_link(stream, subscription_name, subscriber, start_from) do
+  def start_link(stream, subscription_name, subscriber, opts) do
     state = %State{
       stream: stream,
       name: subscription_name,
       subscriber: subscriber,
-      start_from: start_from,
+      start_from: Keyword.get(opts, :start_from),
+      subscriber_max_count: Keyword.get(opts, :subscriber_max_count),
       retry_interval: subscription_retry_interval()
     }
 
     # Prevent duplicate subscriptions by stream/name
-    name = {:global, {__MODULE__, stream, subscription_name}}
+    name = {:global, {__MODULE__, stream, subscription_name, Keyword.get(opts, :index, 1)}}
 
     GenServer.start_link(__MODULE__, state, name: name)
   end
@@ -54,7 +55,15 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     GenServer.cast(subscription, {:ack, event_number})
   end
 
-  def init(%State{subscriber: subscriber} = state) do
+  @doc """
+  Get the subscriber PID associated with this subscription.
+  """
+  def subscriber(subscription), do: GenServer.call(subscription, :subscriber)
+
+  @impl GenServer
+  def init(%State{} = state) do
+    %State{subscriber: subscriber} = state
+
     state = %State{state | subscriber_ref: Process.monitor(subscriber)}
 
     send(self(), :subscribe)
@@ -62,6 +71,14 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     {:ok, state}
   end
 
+  @impl GenServer
+  def handle_call(:subscriber, _from, state) do
+    %State{subscriber: subscriber} = state
+
+    {:reply, subscriber, state}
+  end
+
+  @impl GenServer
   def handle_cast({:ack, event_number}, %State{last_seen_event_number: event_number} = state) do
     %State{
       subscription: subscription,
@@ -78,6 +95,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     {:noreply, state}
   end
 
+  @impl GenServer
   def handle_info(:subscribe, state) do
     Logger.debug(fn ->
       describe(state) <>
@@ -87,6 +105,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     {:noreply, subscribe(state)}
   end
 
+  @impl GenServer
   def handle_info({:on_event, event, correlation_id}, %State{} = state) do
     %State{subscriber: subscriber, subscription: subscription} = state
 
@@ -126,6 +145,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     {:noreply, state}
   end
 
+  @impl GenServer
   def handle_info({:DOWN, ref, :process, _pid, reason}, %State{} = state) do
     Logger.debug(fn -> describe(state) <> " down due to: #{inspect(reason)}" end)
 
@@ -171,13 +191,19 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
 
   defp notify_subscribed(%State{subscriber: subscriber}) do
     send(subscriber, {:subscribed, self()})
+
     :ok
   end
 
   defp create_persistent_subscription(%State{} = state) do
-    %State{name: name, stream: stream, start_from: start_from} = state
+    %State{
+      name: name,
+      stream: stream,
+      start_from: start_from,
+      subscriber_max_count: subscriber_max_count
+    } = state
 
-    from_event_number =
+    start_from =
       case start_from do
         :origin -> 0
         :current -> -1
@@ -189,7 +215,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
         subscription_group_name: name,
         event_stream_id: stream,
         resolve_link_tos: true,
-        start_from: from_event_number,
+        start_from: start_from,
         message_timeout_milliseconds: 10_000,
         record_statistics: false,
         live_buffer_size: 500,
@@ -200,13 +226,13 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
         checkpoint_after_time: 1_000,
         checkpoint_max_count: 500,
         checkpoint_min_count: 1,
-        subscriber_max_count: 1
+        subscriber_max_count: subscriber_max_count
       )
 
     case Extreme.execute(@event_store, message) do
       {:ok, %ExMsg.CreatePersistentSubscriptionCompleted{result: :Success}} -> :ok
       {:error, :AlreadyExists, _response} -> :ok
-      error -> error
+      reply -> reply
     end
   end
 
@@ -222,11 +248,11 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   defp subscription_retry_interval do
     case Application.get_env(:commanded_extreme_adapter, :subscription_retry_interval) do
       interval when is_integer(interval) and interval > 0 ->
-        # ensure interval is no less than one second
+        # Ensure interval is no less than one second
         max(interval, 1_000)
 
       _ ->
-        # default to 60s
+        # Default to one minute
         60_000
     end
   end

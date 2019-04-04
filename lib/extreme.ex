@@ -8,16 +8,15 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 
   require Logger
 
-  alias Commanded.EventStore.{EventData, RecordedEvent, SnapshotData, TypeProvider}
-
-  alias Commanded.EventStore.Adapters.Extreme.{
-    Config,
-    Mapper,
-    PubSub,
-    Subscription,
-    SubscriptionsSupervisor
-  }
-
+  alias Commanded.EventStore.Adapters.Extreme.Config
+  alias Commanded.EventStore.Adapters.Extreme.Mapper
+  alias Commanded.EventStore.Adapters.Extreme.PubSub
+  alias Commanded.EventStore.Adapters.Extreme.Subscription
+  alias Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor
+  alias Commanded.EventStore.EventData
+  alias Commanded.EventStore.RecordedEvent
+  alias Commanded.EventStore.SnapshotData
+  alias Commanded.EventStore.TypeProvider
   alias Extreme.Msg, as: ExMsg
 
   @event_store Commanded.EventStore.Adapters.Extreme.EventStore
@@ -44,6 +43,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   @impl Commanded.EventStore
   def stream_forward(stream_uuid, start_version \\ 0, read_batch_size \\ 1_000)
 
+  @impl Commanded.EventStore
   def stream_forward(stream_uuid, start_version, read_batch_size) do
     stream = stream_name(stream_uuid)
     start_version = normalize_start_version(start_version)
@@ -64,10 +64,9 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   @impl Commanded.EventStore
-  def subscribe(stream_uuid)
-
   def subscribe(:all), do: subscribe("$all")
 
+  @impl Commanded.EventStore
   def subscribe(stream_uuid) do
     with {:ok, _} <- Registry.register(PubSub, stream_uuid, []) do
       :ok
@@ -77,18 +76,19 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   @impl Commanded.EventStore
-  def subscribe_to(stream_uuid, subscription_name, subscriber, start_from \\ :origin)
-
-  def subscribe_to(:all, subscription_name, subscriber, start_from) do
+  def subscribe_to(:all, subscription_name, subscriber, opts) do
     stream = Config.all_stream()
+    opts = subscription_options(opts)
 
-    SubscriptionsSupervisor.start_subscription(stream, subscription_name, subscriber, start_from)
+    SubscriptionsSupervisor.start_subscription(stream, subscription_name, subscriber, opts)
   end
 
-  def subscribe_to(stream_uuid, subscription_name, subscriber, start_from) do
+  @impl Commanded.EventStore
+  def subscribe_to(stream_uuid, subscription_name, subscriber, opts) do
     stream = stream_name(stream_uuid)
+    opts = subscription_options(opts)
 
-    SubscriptionsSupervisor.start_subscription(stream, subscription_name, subscriber, start_from)
+    SubscriptionsSupervisor.start_subscription(stream, subscription_name, subscriber, opts)
   end
 
   @impl Commanded.EventStore
@@ -112,7 +112,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   def delete_subscription(stream_uuid, subscription_name) do
     stream = stream_name(stream_uuid)
 
-    delete_persistent_subscription(stream_uuid, subscription_name)
+    delete_persistent_subscription(stream, subscription_name)
   end
 
   @impl Commanded.EventStore
@@ -381,6 +381,14 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   defp serialize(data), do: Config.serializer().serialize(data)
+
+  defp subscription_options(opts) do
+    {subscriber_max_count, opts} = Keyword.pop(opts, :concurrency, 1)
+
+    opts
+    |> Keyword.put_new(:start_from, :origin)
+    |> Keyword.put(:subscriber_max_count, subscriber_max_count)
+  end
 
   # Event store supports the following special values for expected version:
   #

@@ -36,7 +36,11 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp deps do
     [
-      {:commanded, "~> 0.18", runtime: Mix.env() == :test},
+      # {:commanded, "~> 0.18", runtime: Mix.env() == :test},
+      {:commanded,
+       github: "commanded/commanded",
+       branch: "feature/event-handler-concurrency",
+       runtime: Mix.env() == :test},
       {:extreme, "~> 0.13"},
       {:httpoison, "~> 1.2 or ~> 1.3"},
 

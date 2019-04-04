@@ -1,3 +1,5 @@
 use Mix.Config
 
-import_config "#{Mix.env}.exs"
+config :commanded, :event_store_adapter, Commanded.EventStore.Adapters.Extreme
+
+import_config "#{Mix.env()}.exs"
