@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+
+### Enhancements
+
+- Support for Commanded v0.19.
+
 ## v0.7.0
 
 ### Bug fixes

@@ -1,7 +1,7 @@
 defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
   use Mix.Project
 
-  @version "0.7.0"
+  @version "0.8.0"
 
   def project do
     [
@@ -36,7 +36,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp deps do
     [
-      {:commanded, github: "commanded/commanded", branch: "master", runtime: Mix.env() == :test},
+      {:commanded, ">= 0.19.0", runtime: Mix.env() == :test},
       {:extreme, "~> 0.13"},
       {:exprotobuf, "== 1.2.9"},
       {:httpoison, "~> 1.2 or ~> 1.3"},
