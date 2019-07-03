@@ -38,7 +38,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
       name: subscription_name,
       subscriber: subscriber,
       start_from: Keyword.get(opts, :start_from),
-      subscriber_max_count: Keyword.get(opts, :subscriber_max_count),
+      subscriber_max_count: Keyword.get(opts, :subscriber_max_count, 1),
       retry_interval: subscription_retry_interval()
     }
 

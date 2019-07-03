@@ -49,7 +49,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mapper do
       event_type: event_type,
       data: data,
       metadata: metadata,
-      created_at: to_naive_date_time(created_epoch)
+      created_at: to_date_time(created_epoch)
     }
   end
 
@@ -63,12 +63,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mapper do
     |> Enum.join("-")
   end
 
-  defp to_naive_date_time(millis_since_epoch) do
-    secs_since_epoch = round(Float.floor(millis_since_epoch / 1000))
-    millis = :erlang.rem(millis_since_epoch, 1000)
-    epoch_secs = :calendar.datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}})
-    erl_date = :calendar.gregorian_seconds_to_datetime(epoch_secs + secs_since_epoch)
-
-    NaiveDateTime.from_erl!(erl_date, {millis * 1000, 3})
+  defp to_date_time(millis_since_epoch) do
+    DateTime.from_unix!(millis_since_epoch, :millisecond)
   end
 end
