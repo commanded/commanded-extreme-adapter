@@ -1,24 +1,25 @@
 defmodule Commanded.EventStore.Adapters.Extreme.Mapper do
-  alias Commanded.EventStore.Adapters.Extreme.Config
+  @moduledoc false
+
   alias Commanded.EventStore.RecordedEvent
   alias Extreme.Msg, as: ExMsg
 
-  def to_recorded_event(%ExMsg.ResolvedIndexedEvent{event: event, link: nil}),
-    do: to_recorded_event(event, event.event_number + 1)
+  def to_recorded_event(%ExMsg.ResolvedIndexedEvent{event: event, link: nil}, serializer),
+    do: to_recorded_event(event, event.event_number + 1, serializer)
 
-  def to_recorded_event(%ExMsg.ResolvedIndexedEvent{event: event, link: link}),
-    do: to_recorded_event(event, link.event_number + 1)
+  def to_recorded_event(%ExMsg.ResolvedIndexedEvent{event: event, link: link}, serializer),
+    do: to_recorded_event(event, link.event_number + 1, serializer)
 
-  def to_recorded_event(%ExMsg.ResolvedEvent{event: event, link: nil}),
-    do: to_recorded_event(event, event.event_number + 1)
+  def to_recorded_event(%ExMsg.ResolvedEvent{event: event, link: nil}, serializer),
+    do: to_recorded_event(event, event.event_number + 1, serializer)
 
-  def to_recorded_event(%ExMsg.ResolvedEvent{event: event, link: link}),
-    do: to_recorded_event(event, link.event_number + 1)
+  def to_recorded_event(%ExMsg.ResolvedEvent{event: event, link: link}, serializer),
+    do: to_recorded_event(event, link.event_number + 1, serializer)
 
-  def to_recorded_event(%ExMsg.EventRecord{} = event),
-    do: to_recorded_event(event, event.event_number + 1)
+  def to_recorded_event(%ExMsg.EventRecord{} = event, serializer),
+    do: to_recorded_event(event, event.event_number + 1, serializer)
 
-  def to_recorded_event(%ExMsg.EventRecord{} = event, event_number) do
+  def to_recorded_event(%ExMsg.EventRecord{} = event, event_number, serializer) do
     %ExMsg.EventRecord{
       event_id: event_id,
       event_type: event_type,
@@ -28,12 +29,12 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mapper do
       metadata: metadata
     } = event
 
-    data = deserialize(data, type: event_type)
+    data = serializer.deserialize(data, type: event_type)
 
     metadata =
       case metadata do
         none when none in [nil, ""] -> %{}
-        metadata -> deserialize(metadata)
+        metadata -> serializer.deserialize(metadata, [])
       end
 
     {causation_id, metadata} = Map.pop(metadata, "$causationId")
@@ -52,9 +53,6 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mapper do
       created_at: to_date_time(created_epoch)
     }
   end
-
-  defp deserialize(data, opts \\ []),
-    do: Config.serializer().deserialize(data, opts)
 
   defp to_stream_id(%ExMsg.EventRecord{event_stream_id: event_stream_id}) do
     event_stream_id

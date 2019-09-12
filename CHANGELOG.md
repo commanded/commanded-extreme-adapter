@@ -1,5 +1,9 @@
 # Changelog
 
+## Next release
+
+- Support multiple Commanded apps ([#25](https://github.com/commanded/commanded-extreme-adapter/pull/25)).
+
 ## 0.8.0
 
 ### Enhancements

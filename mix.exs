@@ -11,6 +11,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
       elixirc_paths: elixirc_paths(Mix.env()),
       consolidate_protocols: Mix.env() != :test,
       description: description(),
+      docs: docs(),
       package: package(),
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
@@ -36,7 +37,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp deps do
     [
-      {:commanded, ">= 0.19.0", runtime: Mix.env() == :test},
+      {:commanded, github: "commanded/commanded"},
       {:extreme, "~> 0.13"},
       {:exprotobuf, "== 1.2.9"},
       {:httpoison, "~> 1.2 or ~> 1.3"},
@@ -57,6 +58,19 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
     """
   end
 
+  defp docs do
+    [
+      main: "Getting-Started",
+      canonical: "http://hexdocs.pm/commanded_extreme_adapter",
+      source_ref: "v#{@version}",
+      extras: [
+        {"guides/Getting Started.md", title: "Extreme adapter"},
+        "guides/Testing.md",
+        "CHANGELOG.md"
+      ]
+    ]
+  end
+
   defp package do
     [
       files: [
@@ -68,8 +82,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
       maintainers: ["Ben Smith"],
       licenses: ["MIT"],
       links: %{
-        "GitHub" => "https://github.com/commanded/commanded-extreme-adapter",
-        "Docs" => "https://hexdocs.pm/commanded_extreme_adapter/"
+        "GitHub" => "https://github.com/commanded/commanded-extreme-adapter"
       }
     ]
   end

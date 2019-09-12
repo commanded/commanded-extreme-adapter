@@ -1,14 +1,11 @@
 defmodule Commanded.EventStore.Adapters.Extreme.Config do
-  def all_stream, do: "$ce-" <> stream_prefix()
+  @moduledoc false
 
-  def event_store_settings do
-    Application.get_env(:extreme, :event_store) ||
-      raise ArgumentError, "expects :extreme to be configured in environment"
-  end
+  def all_stream(config), do: "$ce-" <> stream_prefix(config)
 
-  def stream_prefix do
+  def stream_prefix(config) do
     prefix =
-      Application.get_env(:commanded_extreme_adapter, :stream_prefix) ||
+      Keyword.get(config, :stream_prefix) ||
         raise ArgumentError, "expects :stream_prefix to be configured in environment"
 
     case String.contains?(prefix, "-") do
@@ -17,8 +14,8 @@ defmodule Commanded.EventStore.Adapters.Extreme.Config do
     end
   end
 
-  def serializer do
-    Application.get_env(:commanded_extreme_adapter, :serializer) ||
+  def serializer(config) do
+    Keyword.get(config, :serializer) ||
       raise ArgumentError, "expects :serializer to be configured in environment"
   end
 end

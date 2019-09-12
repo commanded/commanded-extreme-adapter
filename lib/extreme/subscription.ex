@@ -1,4 +1,6 @@
 defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
+  @moduledoc false
+
   use GenServer
 
   require Logger
@@ -7,15 +9,17 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   alias Commanded.EventStore.RecordedEvent
   alias Extreme.Msg, as: ExMsg
 
-  @event_store Commanded.EventStore.Adapters.Extreme.EventStore
-
   defmodule State do
+    @moduledoc false
+
     defstruct [
+      :server,
       :last_seen_correlation_id,
       :last_seen_event_id,
       :last_seen_event_number,
       :name,
       :retry_interval,
+      :serializer,
       :stream,
       :start_from,
       :subscriber_max_count,
@@ -32,10 +36,12 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   @doc """
   Start a process to create and connect a persistent connection to the Event Store
   """
-  def start_link(stream, subscription_name, subscriber, opts) do
+  def start_link(event_store, stream, subscription_name, subscriber, serializer, opts) do
     state = %State{
+      server: Module.concat(event_store, Extreme),
       stream: stream,
       name: subscription_name,
+      serializer: serializer,
       subscriber: subscriber,
       start_from: Keyword.get(opts, :start_from),
       subscriber_max_count: Keyword.get(opts, :subscriber_max_count, 1),
@@ -43,7 +49,9 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     }
 
     # Prevent duplicate subscriptions by stream/name
-    name = {:global, {__MODULE__, stream, subscription_name, Keyword.get(opts, :index, 1)}}
+    name =
+      {:global,
+       {event_store, __MODULE__, stream, subscription_name, Keyword.get(opts, :index, 1)}}
 
     GenServer.start_link(__MODULE__, state, name: name)
   end
@@ -99,7 +107,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
 
   @impl GenServer
   def handle_info({:on_event, event, correlation_id}, %State{} = state) do
-    %State{subscriber: subscriber, subscription: subscription} = state
+    %State{subscriber: subscriber, subscription: subscription, serializer: serializer} = state
 
     Logger.debug(fn -> describe(state) <> " received event: #{inspect(event)}" end)
 
@@ -114,7 +122,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
     state =
       if event_type != nil and "$" != String.first(event_type) do
         %RecordedEvent{event_number: event_number} =
-          recorded_event = Mapper.to_recorded_event(event)
+          recorded_event = Mapper.to_recorded_event(event, serializer)
 
         send(subscriber, {:events, [recorded_event]})
 
@@ -189,6 +197,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
 
   defp create_persistent_subscription(%State{} = state) do
     %State{
+      server: server,
       name: name,
       stream: stream,
       start_from: start_from,
@@ -221,7 +230,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
         subscriber_max_count: subscriber_max_count
       )
 
-    case Extreme.execute(@event_store, message) do
+    case Extreme.execute(server, message) do
       {:ok, %ExMsg.CreatePersistentSubscriptionCompleted{result: :Success}} -> :ok
       {:error, :AlreadyExists, _response} -> :ok
       reply -> reply
@@ -229,9 +238,9 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   end
 
   defp connect_to_persistent_subscription(%State{} = state) do
-    %State{name: name, stream: stream} = state
+    %State{server: server, name: name, stream: stream} = state
 
-    Extreme.connect_to_persistent_subscription(@event_store, self(), name, stream, 1)
+    Extreme.connect_to_persistent_subscription(server, self(), name, stream, 1)
   end
 
   # Get the delay between subscription attempts, in milliseconds, from app
