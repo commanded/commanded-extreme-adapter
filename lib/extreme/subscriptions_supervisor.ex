@@ -5,8 +5,8 @@ defmodule Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor do
 
   alias Commanded.EventStore.Adapters.Extreme.Subscription
 
-  def start_link(args) do
-    DynamicSupervisor.start_link(__MODULE__, args, name: __MODULE__)
+  def start_link(opts) do
+    DynamicSupervisor.start_link(__MODULE__, [], opts)
   end
 
   @impl DynamicSupervisor
@@ -14,10 +14,29 @@ defmodule Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor do
     DynamicSupervisor.init(strategy: :one_for_one)
   end
 
-  def start_subscription(stream, subscription_name, subscriber, opts, index \\ 0) do
-    spec = subscription_spec(stream, subscription_name, subscriber, opts, index)
+  def start_subscription(
+        event_store,
+        stream,
+        subscription_name,
+        subscriber,
+        serializer,
+        opts,
+        index \\ 0
+      ) do
+    name = name(event_store)
 
-    case DynamicSupervisor.start_child(__MODULE__, spec) do
+    spec =
+      subscription_spec(
+        event_store,
+        stream,
+        subscription_name,
+        subscriber,
+        serializer,
+        opts,
+        index
+      )
+
+    case DynamicSupervisor.start_child(name, spec) do
       {:ok, pid} ->
         {:ok, pid}
 
@@ -31,7 +50,14 @@ defmodule Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor do
 
           subscriber_max_count ->
             if index < subscriber_max_count - 1 do
-              start_subscription(stream, subscription_name, subscriber, opts, index + 1)
+              start_subscription(
+                stream,
+                subscription_name,
+                subscriber,
+                serializer,
+                opts,
+                index + 1
+              )
             else
               {:error, :too_many_subscribers}
             end
@@ -42,15 +68,27 @@ defmodule Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor do
     end
   end
 
-  def stop_subscription(subscription) do
-    DynamicSupervisor.terminate_child(__MODULE__, subscription)
+  def stop_subscription(event_store, subscription) do
+    name = name(event_store)
+
+    DynamicSupervisor.terminate_child(name, subscription)
   end
 
-  defp subscription_spec(stream, subscription_name, subscriber, opts, index) do
+  defp subscription_spec(
+         event_store,
+         stream,
+         subscription_name,
+         subscriber,
+         serializer,
+         opts,
+         index
+       ) do
     start_args = [
+      event_store,
       stream,
       subscription_name,
       subscriber,
+      serializer,
       Keyword.put(opts, :index, index)
     ]
 
@@ -62,4 +100,6 @@ defmodule Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor do
       type: :worker
     }
   end
+
+  defp name(event_store), do: Module.concat([event_store, __MODULE__])
 end

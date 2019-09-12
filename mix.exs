@@ -36,7 +36,9 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp deps do
     [
-      {:commanded, ">= 0.19.0", runtime: Mix.env() == :test},
+      # {:commanded, ">= 0.19.0", runtime: Mix.env() == :test},
+      {:commanded,
+       github: "commanded/commanded", branch: "feature/multi-app", runtime: Mix.env() == :test},
       {:extreme, "~> 0.13"},
       {:exprotobuf, "== 1.2.9"},
       {:httpoison, "~> 1.2 or ~> 1.3"},
@@ -68,8 +70,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
       maintainers: ["Ben Smith"],
       licenses: ["MIT"],
       links: %{
-        "GitHub" => "https://github.com/commanded/commanded-extreme-adapter",
-        "Docs" => "https://hexdocs.pm/commanded_extreme_adapter/"
+        "GitHub" => "https://github.com/commanded/commanded-extreme-adapter"
       }
     ]
   end
