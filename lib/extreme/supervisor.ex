@@ -1,4 +1,6 @@
 defmodule Commanded.EventStore.Adapters.Extreme.Supervisor do
+  @moduledoc false
+
   use Supervisor
 
   alias Commanded.EventStore.Adapters.Extreme.Config

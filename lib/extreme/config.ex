@@ -1,4 +1,6 @@
 defmodule Commanded.EventStore.Adapters.Extreme.Config do
+  @moduledoc false
+
   def all_stream(config), do: "$ce-" <> stream_prefix(config)
 
   def stream_prefix(config) do

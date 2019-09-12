@@ -1,4 +1,6 @@
 defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
+  @moduledoc false
+
   use GenServer
 
   require Logger
@@ -8,6 +10,8 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   alias Extreme.Msg, as: ExMsg
 
   defmodule State do
+    @moduledoc false
+
     defstruct [
       :server,
       :last_seen_correlation_id,

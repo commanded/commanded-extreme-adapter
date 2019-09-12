@@ -1,9 +1,13 @@
 defmodule Commanded.EventStore.Adapters.Extreme.EventPublisher do
+  @moduledoc false
+
   use GenServer
 
   require Logger
 
   defmodule State do
+    @moduledoc false
+
     defstruct [:event_store, :pubsub, :subscription_ref, :stream_name, :serializer]
   end
 

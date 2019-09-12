@@ -1,4 +1,6 @@
 defmodule Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor do
+  @moduledoc false
+
   use DynamicSupervisor
 
   require Logger

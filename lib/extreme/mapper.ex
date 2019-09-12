@@ -1,4 +1,6 @@
 defmodule Commanded.EventStore.Adapters.Extreme.Mapper do
+  @moduledoc false
+
   alias Commanded.EventStore.RecordedEvent
   alias Extreme.Msg, as: ExMsg
 
