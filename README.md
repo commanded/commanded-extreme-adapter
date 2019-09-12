@@ -12,6 +12,10 @@ MIT License
 
 ---
 
+> This README and the following guides follow the `master` branch which may not be the currently published version.
+>
+> [Read the documentation for the latest published version of Commanded Extreme adapter on Hex](https://hexdocs.pm/commanded_extreme_adapter/).
+
 ### Overview
 
 - [Getting started](guides/Getting%20Started.md)
