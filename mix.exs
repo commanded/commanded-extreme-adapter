@@ -37,7 +37,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp deps do
     [
-      {:commanded, "~> 1.0.0-rc.0"},
+      {:commanded, github: "commanded/commanded"},
       {:extreme, "~> 0.13"},
 
       # Optional dependencies
@@ -45,7 +45,6 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
       # Test & build tooling
       {:ex_doc, "~> 0.21", only: :dev},
-      {:mix_test_watch, "~> 0.9", only: :dev},
       {:mox, "~> 0.5", only: :test}
     ]
   end

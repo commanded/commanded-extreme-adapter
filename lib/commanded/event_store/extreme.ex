@@ -4,7 +4,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   client, with Commanded.
   """
 
-  @behaviour Commanded.EventStore
+  @behaviour Commanded.EventStore.Adapter
 
   require Logger
 
@@ -18,36 +18,48 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   alias Commanded.EventStore.TypeProvider
   alias Extreme.Msg, as: ExMsg
 
-  @impl Commanded.EventStore
-  def child_spec(event_store, config) do
-    [
-      {Commanded.EventStore.Adapters.Extreme.Supervisor, {event_store, config}}
+  @impl Commanded.EventStore.Adapter
+  def child_spec(application, config) do
+    event_store = Module.concat([application, Extreme])
+
+    child_spec = [
+      {Commanded.EventStore.Adapters.Extreme.Supervisor,
+       Keyword.put(config, :event_store, event_store)}
     ]
+
+    adapter_meta = %{
+      all_stream: Config.all_stream(config),
+      event_store: event_store,
+      stream_prefix: Config.stream_prefix(config),
+      serializer: Config.serializer(config)
+    }
+
+    {:ok, child_spec, adapter_meta}
   end
 
-  @impl Commanded.EventStore
-  def append_to_stream({event_store, config}, stream_uuid, expected_version, events) do
-    stream = stream_name(config, stream_uuid)
+  @impl Commanded.EventStore.Adapter
+  def append_to_stream(adapter_meta, stream_uuid, expected_version, events) do
+    stream = stream_name(adapter_meta, stream_uuid)
 
     Logger.debug(fn ->
       "Extreme event store attempting to append to stream " <>
         inspect(stream) <> " " <> inspect(length(events)) <> " event(s)"
     end)
 
-    add_to_stream({event_store, config}, stream, expected_version, events)
+    add_to_stream(adapter_meta, stream, expected_version, events)
   end
 
-  @impl Commanded.EventStore
+  @impl Commanded.EventStore.Adapter
   def stream_forward(
-        {event_store, config},
+        adapter_meta,
         stream_uuid,
         start_version \\ 0,
         read_batch_size \\ 1_000
       ) do
-    stream = stream_name(config, stream_uuid)
+    stream = stream_name(adapter_meta, stream_uuid)
     start_version = normalize_start_version(start_version)
 
-    case execute_read({event_store, config}, stream, start_version, read_batch_size, :forward) do
+    case execute_read(adapter_meta, stream, start_version, read_batch_size, :forward) do
       {:ok, events, true} ->
         events
 
@@ -55,7 +67,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
         Stream.concat(
           events,
           execute_stream_forward(
-            {event_store, config},
+            adapter_meta,
             stream,
             start_version + length(events),
             read_batch_size
@@ -67,11 +79,12 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  @impl Commanded.EventStore
-  def subscribe({event_store, config}, :all), do: subscribe({event_store, config}, "$all")
+  @impl Commanded.EventStore.Adapter
+  def subscribe(adapter_meta, :all), do: subscribe(adapter_meta, "$all")
 
-  @impl Commanded.EventStore
-  def subscribe({event_store, _config}, stream_uuid) do
+  @impl Commanded.EventStore.Adapter
+  def subscribe(adapter_meta, stream_uuid) do
+    event_store = server_name(adapter_meta)
     pubsub_name = Module.concat([event_store, PubSub])
 
     with {:ok, _} <- Registry.register(pubsub_name, stream_uuid, []) do
@@ -79,10 +92,11 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  @impl Commanded.EventStore
-  def subscribe_to({event_store, config}, :all, subscription_name, subscriber, start_from) do
-    stream = Config.all_stream(config)
-    serializer = Config.serializer(config)
+  @impl Commanded.EventStore.Adapter
+  def subscribe_to(adapter_meta, :all, subscription_name, subscriber, start_from) do
+    event_store = server_name(adapter_meta)
+    stream = Map.fetch!(adapter_meta, :all_stream)
+    serializer = serializer(adapter_meta)
     opts = subscription_options(start_from)
 
     SubscriptionsSupervisor.start_subscription(
@@ -95,10 +109,11 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     )
   end
 
-  @impl Commanded.EventStore
-  def subscribe_to({event_store, config}, stream_uuid, subscription_name, subscriber, start_from) do
-    stream = stream_name(config, stream_uuid)
-    serializer = Config.serializer(config)
+  @impl Commanded.EventStore.Adapter
+  def subscribe_to(adapter_meta, stream_uuid, subscription_name, subscriber, start_from) do
+    event_store = server_name(adapter_meta)
+    stream = stream_name(adapter_meta, stream_uuid)
+    serializer = serializer(adapter_meta)
     opts = subscription_options(start_from)
 
     SubscriptionsSupervisor.start_subscription(
@@ -111,37 +126,41 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     )
   end
 
-  @impl Commanded.EventStore
-  def ack_event(_event_store, subscription, %RecordedEvent{event_number: event_number}) do
+  @impl Commanded.EventStore.Adapter
+  def ack_event(_adapter_meta, subscription, %RecordedEvent{event_number: event_number}) do
     Subscription.ack(subscription, event_number)
   end
 
-  @impl Commanded.EventStore
-  def unsubscribe({event_store, _config}, subscription) do
+  @impl Commanded.EventStore.Adapter
+  def unsubscribe(adapter_meta, subscription) do
+    event_store = server_name(adapter_meta)
+
     SubscriptionsSupervisor.stop_subscription(event_store, subscription)
   end
 
-  @impl Commanded.EventStore
-  def delete_subscription({event_store, config}, :all, subscription_name) do
-    stream = Config.all_stream(config)
+  @impl Commanded.EventStore.Adapter
+  def delete_subscription(adapter_meta, :all, subscription_name) do
+    event_store = server_name(adapter_meta)
+    stream = Map.fetch!(adapter_meta, :all_stream)
 
     delete_persistent_subscription(event_store, stream, subscription_name)
   end
 
-  @impl Commanded.EventStore
-  def delete_subscription({event_store, config}, stream_uuid, subscription_name) do
-    stream = stream_name(config, stream_uuid)
+  @impl Commanded.EventStore.Adapter
+  def delete_subscription(adapter_meta, stream_uuid, subscription_name) do
+    event_store = server_name(adapter_meta)
+    stream = stream_name(adapter_meta, stream_uuid)
 
     delete_persistent_subscription(event_store, stream, subscription_name)
   end
 
-  @impl Commanded.EventStore
-  def read_snapshot({event_store, config}, source_uuid) do
-    stream = snapshot_stream(config, source_uuid)
+  @impl Commanded.EventStore.Adapter
+  def read_snapshot(adapter_meta, source_uuid) do
+    stream = snapshot_stream_name(adapter_meta, source_uuid)
 
     Logger.debug(fn -> "Extreme event store read snapshot from stream: " <> inspect(stream) end)
 
-    case execute_read({event_store, config}, stream, -1, 1, :backward) do
+    case execute_read(adapter_meta, stream, -1, 1, :backward) do
       {:ok, [recorded_event], _end_of_stream?} ->
         {:ok, to_snapshot_data(recorded_event)}
 
@@ -154,31 +173,33 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  @impl Commanded.EventStore
-  def record_snapshot({event_store, config}, %SnapshotData{} = snapshot) do
+  @impl Commanded.EventStore.Adapter
+  def record_snapshot(adapter_meta, %SnapshotData{} = snapshot) do
     event_data = to_event_data(snapshot)
-    stream = snapshot_stream(config, snapshot.source_uuid)
+    stream = snapshot_stream_name(adapter_meta, snapshot.source_uuid)
 
     Logger.debug(fn -> "Extreme event store record snapshot to stream: " <> inspect(stream) end)
 
-    case add_to_stream({event_store, config}, stream, :any_version, [event_data]) do
+    case add_to_stream(adapter_meta, stream, :any_version, [event_data]) do
       {:ok, _} -> :ok
       err -> err
     end
   end
 
-  @impl Commanded.EventStore
-  def delete_snapshot({event_store, config}, source_uuid) do
-    server = server_name(event_store)
-    stream = snapshot_stream(config, source_uuid)
+  @impl Commanded.EventStore.Adapter
+  def delete_snapshot(adapter_meta, source_uuid) do
+    server = server_name(adapter_meta)
+    stream = snapshot_stream_name(adapter_meta, source_uuid)
 
-    case Extreme.execute(server, delete_stream_msg(stream, false)) do
+    msg = delete_stream_msg(stream, false)
+
+    case Extreme.execute(server, msg) do
       {:ok, _} -> :ok
       err -> err
     end
   end
 
-  defp execute_stream_forward({event_store, config}, stream, start_version, read_batch_size) do
+  defp execute_stream_forward(adapter_meta, stream, start_version, read_batch_size) do
     Stream.resource(
       fn -> {start_version, false} end,
       fn {next_version, halt?} = acc ->
@@ -188,7 +209,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 
           false ->
             case execute_read(
-                   {event_store, config},
+                   adapter_meta,
                    stream,
                    next_version,
                    read_batch_size,
@@ -205,17 +226,18 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     )
   end
 
-  defp prefix(config, suffix), do: Config.stream_prefix(config) <> "-" <> suffix
+  defp stream_name(adapter_meta, stream_uuid),
+    do: Map.fetch!(adapter_meta, :stream_prefix) <> "-" <> stream_uuid
 
-  defp snapshot_stream(config, source_uuid),
-    do: Config.stream_prefix(config) <> "snapshot-" <> source_uuid
-
-  defp stream_name(config, stream), do: prefix(config, stream)
+  defp snapshot_stream_name(adapter_meta, source_uuid),
+    do: Map.fetch!(adapter_meta, :stream_prefix) <> "snapshot-" <> source_uuid
 
   defp normalize_start_version(0), do: 0
   defp normalize_start_version(start_version), do: start_version - 1
 
-  defp to_snapshot_data(%RecordedEvent{data: snapshot} = event) do
+  defp to_snapshot_data(%RecordedEvent{} = event) do
+    %RecordedEvent{data: snapshot} = event
+
     data =
       snapshot.source_type
       |> String.to_existing_atom()
@@ -232,10 +254,10 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     }
   end
 
-  defp add_to_stream({event_store, config}, stream, :stream_exists, events) do
-    case execute_read({event_store, config}, stream, 0, 1, :forward) do
+  defp add_to_stream(adapter_meta, stream, :stream_exists, events) do
+    case execute_read(adapter_meta, stream, 0, 1, :forward) do
       {:ok, _events, _end_of_stream?} ->
-        add_to_stream({event_store, config}, stream, :any_version, events)
+        add_to_stream(adapter_meta, stream, :any_version, events)
 
       {:error, :stream_not_found} ->
         {:error, :stream_does_not_exist}
@@ -245,9 +267,11 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  defp add_to_stream({event_store, config}, stream, expected_version, events) do
-    server = server_name(event_store)
-    msg = write_events(stream, expected_version, events, config)
+  defp add_to_stream(adapter_meta, stream, expected_version, events) do
+    server = server_name(adapter_meta)
+    serializer = serializer(adapter_meta)
+
+    msg = write_events(stream, expected_version, events, serializer)
 
     case Extreme.execute(server, msg) do
       {:ok, _response} ->
@@ -280,18 +304,18 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   defp execute_read(
-         {event_store, config},
+         adapter_meta,
          stream,
          start_version,
          count,
          direction,
          read_events \\ []
        ) do
-    server = server_name(event_store)
+    server = server_name(adapter_meta)
     remaining_count = count - length(read_events)
     read_request = read_events(stream, start_version, remaining_count, direction)
 
-    serializer = Config.serializer(config)
+    serializer = Map.fetch!(adapter_meta, :serializer)
 
     case Extreme.execute(server, read_request) do
       {:ok, %ExMsg.ReadStreamEventsCompleted{} = result} ->
@@ -315,7 +339,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
             end
 
           execute_read(
-            {event_store, config},
+            adapter_meta,
             stream,
             start_version,
             remaining_count,
@@ -358,7 +382,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 
   defp add_to_metadata(metadata, key, value), do: Map.put(metadata, key, value)
 
-  defp write_events(stream_id, expected_version, events, config) do
+  defp write_events(stream_id, expected_version, events, serializer) do
     expected_version = expected_version(expected_version)
 
     proto_events =
@@ -373,8 +397,8 @@ defmodule Commanded.EventStore.Adapters.Extreme do
           event_type: event.event_type,
           data_content_type: 0,
           metadata_content_type: 0,
-          data: serialize(config, event.data),
-          metadata: serialize(config, metadata)
+          data: serializer.serialize(event.data),
+          metadata: serializer.serialize(metadata)
         )
       end)
 
@@ -386,14 +410,12 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     )
   end
 
-  defp delete_persistent_subscription(event_store, stream, name) do
+  defp delete_persistent_subscription(server, stream, name) do
     Logger.debug(fn ->
       "Attempting to delete persistent subscription named #{inspect(name)} on stream #{
         inspect(stream)
       }"
     end)
-
-    server = server_name(event_store)
 
     message =
       ExMsg.DeletePersistentSubscription.new(
@@ -419,8 +441,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  defp serialize(config, data), do: Config.serializer(config).serialize(data)
-
   defp subscription_options(start_from) do
     [
       start_from: start_from
@@ -440,5 +460,6 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   defp expected_version(:stream_exists), do: 0
   defp expected_version(expected_version), do: expected_version - 1
 
-  defp server_name(event_store), do: Module.concat(event_store, Extreme)
+  defp serializer(adapter_meta), do: Map.fetch!(adapter_meta, :serializer)
+  defp server_name(adapter_meta), do: Map.fetch!(adapter_meta, :event_store)
 end

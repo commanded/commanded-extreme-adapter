@@ -38,7 +38,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Subscription do
   """
   def start_link(event_store, stream, subscription_name, subscriber, serializer, opts) do
     state = %State{
-      server: Module.concat(event_store, Extreme),
+      server: event_store,
       stream: stream,
       name: subscription_name,
       serializer: serializer,
