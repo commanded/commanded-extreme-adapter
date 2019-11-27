@@ -57,7 +57,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp docs do
     [
-      main: "Getting-Started",
+      main: "getting-started",
       canonical: "http://hexdocs.pm/commanded_extreme_adapter",
       source_ref: "v#{@version}",
       extras: [
