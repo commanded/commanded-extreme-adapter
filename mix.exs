@@ -41,7 +41,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
       {:extreme, "~> 0.13"},
 
       # Optional dependencies
-      {:jason, "~> 1.1", optional: true},
+      {:jason, "~> 1.2", optional: true},
 
       # Test & build tooling
       {:ex_doc, "~> 0.21", only: :dev},
