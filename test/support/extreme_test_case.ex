@@ -6,7 +6,7 @@ defmodule Commanded.ExtremeTestCase do
   setup do
     config = [
       serializer: Commanded.Serialization.JsonSerializer,
-      stream_prefix: "commandedtest#{String.replace(UUID.uuid4(), "-", "")}",
+      stream_prefix: "commandedtest" <> UUID.uuid4(:hex),
       extreme: [
         db_type: :node,
         host: "localhost",
