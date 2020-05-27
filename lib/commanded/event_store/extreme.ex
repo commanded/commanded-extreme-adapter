@@ -1,7 +1,9 @@
 defmodule Commanded.EventStore.Adapters.Extreme do
   @moduledoc """
-  Adapter to use [Event Store](https://eventstore.org/), via the Extreme TCP
+  Adapter to use [Event Store](https://eventstore.com/), via the Extreme TCP
   client, with Commanded.
+
+  Please check the [Getting started](getting-started.html) guide to learn more.
   """
 
   @behaviour Commanded.EventStore.Adapter
@@ -20,11 +22,25 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 
   @impl Commanded.EventStore.Adapter
   def child_spec(application, config) do
-    event_store = Module.concat([application, Extreme])
+    event_store =
+      case Keyword.get(config, :name) do
+        nil -> Module.concat([application, Extreme])
+        name -> Module.concat([name, Extreme])
+      end
+
+    # Rename `prefix` config to `stream_prefix`
+    config =
+      case Keyword.pop(config, :prefix) do
+        {nil, config} -> config
+        {prefix, config} -> Keyword.put(config, :stream_prefix, prefix)
+      end
 
     child_spec = [
-      {Commanded.EventStore.Adapters.Extreme.Supervisor,
-       Keyword.put(config, :event_store, event_store)}
+      Supervisor.child_spec(
+        {Commanded.EventStore.Adapters.Extreme.Supervisor,
+         Keyword.put(config, :event_store, event_store)},
+        id: event_store
+      )
     ]
 
     adapter_meta = %{
@@ -393,7 +409,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
           |> add_correlation_id(event.correlation_id)
 
         ExMsg.NewEvent.new(
-          event_id: UUID.uuid4() |> UUID.string_to_binary!(),
+          event_id: UUID.uuid4(:raw),
           event_type: event.event_type,
           data_content_type: 0,
           metadata_content_type: 0,

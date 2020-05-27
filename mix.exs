@@ -1,7 +1,7 @@
 defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
   use Mix.Project
 
-  @version "1.0.0"
+  @version "1.1.0"
 
   def project do
     [
@@ -37,7 +37,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp deps do
     [
-      {:commanded, "~> 1.0"},
+      {:commanded, "~> 1.1"},
       {:extreme, "~> 0.13"},
 
       # Optional dependencies
@@ -57,13 +57,14 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp docs do
     [
-      main: "getting-started",
+      main: "Commanded.EventStore.Adapters.Extreme",
       canonical: "http://hexdocs.pm/commanded_extreme_adapter",
       source_ref: "v#{@version}",
+      extra_section: "GUIDES",
       extras: [
-        {"guides/Getting Started.md", title: "Extreme adapter"},
-        "guides/Testing.md",
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "guides/Getting Started.md": [filename: "getting-started", title: "Extreme adapter"],
+        "guides/Testing.md": [title: "Testing"],
       ]
     ]
   end

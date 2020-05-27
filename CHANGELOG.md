@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.0
+
+- Support Commanded v1.1.0 including new `prefix` event store option.
+
+---
+
 ## v1.0.0
 
 ### Enhancements
