@@ -37,7 +37,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp deps do
     [
-      {:commanded, "~> 1.1"},
+      {:commanded, "~> 1.2"},
       {:extreme, "~> 0.13"},
 
       # Optional dependencies
