@@ -47,12 +47,13 @@ defmodule Commanded.EventStore.Adapters.Extreme.SubscriptionsSupervisor do
 
       {:error, {:already_started, _pid}} ->
         case Keyword.get(opts, :subscriber_max_count) do
-          nil ->
+          subscriber_count when subscriber_count in [nil, 1] ->
             {:error, :subscription_already_exists}
 
           subscriber_max_count ->
             if index < subscriber_max_count - 1 do
               start_subscription(
+                event_store,
                 stream,
                 subscription_name,
                 subscriber,

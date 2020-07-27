@@ -143,6 +143,23 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   @impl Commanded.EventStore.Adapter
+  def subscribe_to(adapter_meta, stream_uuid, subscription_name, subscriber, start_from, options) do
+    event_store = server_name(adapter_meta)
+    stream = stream_name(adapter_meta, stream_uuid)
+    serializer = serializer(adapter_meta)
+    opts = subscription_options(start_from, options)
+
+    SubscriptionsSupervisor.start_subscription(
+      event_store,
+      stream,
+      subscription_name,
+      subscriber,
+      serializer,
+      opts
+    )
+  end
+
+  @impl Commanded.EventStore.Adapter
   def ack_event(_adapter_meta, subscription, %RecordedEvent{event_number: event_number}) do
     Subscription.ack(subscription, event_number)
   end
@@ -457,10 +474,25 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  defp subscription_options(start_from) do
+  defp subscription_options(start_from, options \\ []) do
     [
-      start_from: start_from
+      start_from: start_from,
+      message_timeout_milliseconds: Keyword.get(options, :message_timeout_milliseconds),
+      record_statistics: Keyword.get(options, :record_statistics),
+      live_buffer_size: Keyword.get(options, :live_buffer_size),
+      read_batch_size: Keyword.get(options, :read_batch_size),
+      buffer_size: Keyword.get(options, :buffer_size),
+      max_retry_count: Keyword.get(options, :max_retry_count),
+      prefer_round_robin: Keyword.get(options, :prefer_round_robin),
+      checkpoint_after_time: Keyword.get(options, :checkpoint_after_time),
+      checkpoint_max_count: Keyword.get(options, :checkpoint_max_count),
+      checkpoint_min_count: Keyword.get(options, :checkpoint_min_count),
+      subscriber_max_count: Keyword.get(options, :subscriber_max_count)
     ]
+    |> Enum.reject(fn elmn ->
+      {_, value} = elmn
+      is_nil(value)
+    end)
   end
 
   # Event store supports the following special values for expected version:
