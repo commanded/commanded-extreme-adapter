@@ -37,7 +37,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp deps do
     [
-      {:commanded, "~> 1.1"},
+      {:commanded, "~> 1.2"},
       {:extreme, "~> 0.13"},
 
       # Optional dependencies
@@ -45,7 +45,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
       # Test & build tooling
       {:ex_doc, "~> 0.21", only: :dev},
-      {:mox, "~> 0.5", only: :test}
+      {:mox, "~> 1.0", only: :test}
     ]
   end
 
@@ -64,7 +64,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
       extras: [
         "CHANGELOG.md",
         "guides/Getting Started.md": [filename: "getting-started", title: "Extreme adapter"],
-        "guides/Testing.md": [title: "Testing"],
+        "guides/Testing.md": [title: "Testing"]
       ]
     ]
   end
