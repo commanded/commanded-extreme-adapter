@@ -8,8 +8,6 @@ Use [Event Store](https://geteventstore.com/) with [Commanded](https://github.co
 
 MIT License
 
-[![Build Status](https://travis-ci.com/commanded/commanded-extreme-adapter.svg?branch=master)](https://travis-ci.com/commanded/commanded-extreme-adapter)
-
 ---
 
 > This README and the following guides follow the `master` branch which may not be the currently published version.
