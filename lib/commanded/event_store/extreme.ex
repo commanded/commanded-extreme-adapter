@@ -109,11 +109,11 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   @impl Commanded.EventStore.Adapter
-  def subscribe_to(adapter_meta, :all, subscription_name, subscriber, start_from) do
+  def subscribe_to(adapter_meta, :all, subscription_name, subscriber, start_from, opts) do
     event_store = server_name(adapter_meta)
     stream = Map.fetch!(adapter_meta, :all_stream)
     serializer = serializer(adapter_meta)
-    opts = subscription_options(start_from)
+    opts = subscription_options(opts, start_from)
 
     SubscriptionsSupervisor.start_subscription(
       event_store,
@@ -126,11 +126,11 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   @impl Commanded.EventStore.Adapter
-  def subscribe_to(adapter_meta, stream_uuid, subscription_name, subscriber, start_from) do
+  def subscribe_to(adapter_meta, stream_uuid, subscription_name, subscriber, start_from, opts) do
     event_store = server_name(adapter_meta)
     stream = stream_name(adapter_meta, stream_uuid)
     serializer = serializer(adapter_meta)
-    opts = subscription_options(start_from)
+    opts = subscription_options(opts, start_from)
 
     SubscriptionsSupervisor.start_subscription(
       event_store,
@@ -457,10 +457,8 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     end
   end
 
-  defp subscription_options(start_from) do
-    [
-      start_from: start_from
-    ]
+  defp subscription_options(opts, start_from) do
+    Keyword.put(opts, :start_from, start_from)
   end
 
   # Event store supports the following special values for expected version:
