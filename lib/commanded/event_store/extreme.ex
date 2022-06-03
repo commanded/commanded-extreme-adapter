@@ -28,6 +28,8 @@ defmodule Commanded.EventStore.Adapters.Extreme do
         name -> Module.concat([name, Extreme])
       end
 
+    conn = Module.concat([event_store, Spear.Connection])
+
     # Rename `prefix` config to `stream_prefix`
     config =
       case Keyword.pop(config, :prefix) do
@@ -46,6 +48,7 @@ defmodule Commanded.EventStore.Adapters.Extreme do
     adapter_meta = %{
       all_stream: Config.all_stream(config),
       event_store: event_store,
+      conn: conn,
       stream_prefix: Config.stream_prefix(config),
       serializer: Config.serializer(config)
     }
@@ -284,16 +287,31 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   defp add_to_stream(adapter_meta, stream, expected_version, events) do
-    server = server_name(adapter_meta)
+    conn = conn_name(adapter_meta)
     serializer = serializer(adapter_meta)
 
-    msg = write_events(stream, expected_version, events, serializer)
+    spear_events =
+      Enum.map(events, fn event ->
+        %Spear.Event{
+          body: event.data,
+          id: UUID.uuid4(),
+          metadata: %{
+            content_type: "application/json",
+            custom_metadata:
+              event.metadata
+              |> add_causation_id(event.causation_id)
+              |> add_correlation_id(event.correlation_id)
+              |> serializer.serialize()
+          },
+          type: event.event_type
+        }
+      end)
 
-    case Extreme.execute(server, msg) do
-      {:ok, _response} ->
+    case Spear.append(spear_events, conn, stream, expect: expected_version(expected_version)) do
+      :ok ->
         :ok
 
-      {:error, :WrongExpectedVersion, detail} ->
+      {:error, %Spear.ExpectationViolation{} = detail} ->
         Logger.warn(fn ->
           "Extreme event store wrong expected version " <>
             inspect(expected_version) <> " due to: " <> inspect(detail)
@@ -398,39 +416,9 @@ defmodule Commanded.EventStore.Adapters.Extreme do
 
   defp add_to_metadata(metadata, key, value), do: Map.put(metadata, key, value)
 
-  defp write_events(stream_id, expected_version, events, serializer) do
-    expected_version = expected_version(expected_version)
-
-    proto_events =
-      Enum.map(events, fn event ->
-        metadata =
-          event.metadata
-          |> add_causation_id(event.causation_id)
-          |> add_correlation_id(event.correlation_id)
-
-        ExMsg.NewEvent.new(
-          event_id: UUID.uuid4(:raw),
-          event_type: event.event_type,
-          data_content_type: 0,
-          metadata_content_type: 0,
-          data: serializer.serialize(event.data),
-          metadata: serializer.serialize(metadata)
-        )
-      end)
-
-    ExMsg.WriteEvents.new(
-      event_stream_id: stream_id,
-      expected_version: expected_version,
-      events: proto_events,
-      require_master: false
-    )
-  end
-
   defp delete_persistent_subscription(server, stream, name) do
     Logger.debug(fn ->
-      "Attempting to delete persistent subscription named #{inspect(name)} on stream #{
-        inspect(stream)
-      }"
+      "Attempting to delete persistent subscription named #{inspect(name)} on stream #{inspect(stream)}"
     end)
 
     message =
@@ -469,11 +457,14 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   #
   #  Any other integer value represents the version of the stream you expect.
   #
-  defp expected_version(:any_version), do: -2
-  defp expected_version(:no_stream), do: -1
-  defp expected_version(:stream_exists), do: 0
+  defp expected_version(:any_version), do: :any
+  defp expected_version(:no_stream), do: :empty
+  defp expected_version(:stream_exists), do: :exists
+  defp expected_version(0), do: :empty
+
   defp expected_version(expected_version), do: expected_version - 1
 
   defp serializer(adapter_meta), do: Map.fetch!(adapter_meta, :serializer)
   defp server_name(adapter_meta), do: Map.fetch!(adapter_meta, :event_store)
+  defp conn_name(adapter_meta), do: Map.fetch!(adapter_meta, :conn)
 end

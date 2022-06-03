@@ -18,12 +18,14 @@ defmodule Commanded.EventStore.Adapters.Extreme.Supervisor do
   def init(config) do
     all_stream = Config.all_stream(config)
     extreme_config = Keyword.get(config, :extreme)
+    spear_config = Keyword.get(config, :spear)
     serializer = Config.serializer(config)
 
     event_store = Keyword.fetch!(config, :event_store)
     event_publisher_name = Module.concat([event_store, EventPublisher])
     pubsub_name = Module.concat([event_store, PubSub])
     subscriptions_name = Module.concat([event_store, SubscriptionsSupervisor])
+    spear_name = Module.concat([event_store, Spear.Connection])
 
     children = [
       {Registry, keys: :duplicate, name: pubsub_name, partitions: 1},
@@ -46,6 +48,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Supervisor do
         shutdown: 5000,
         type: :worker
       },
+      {Spear.Connection,  Keyword.merge(spear_config, [name: spear_name])},
       {SubscriptionsSupervisor, name: subscriptions_name}
     ]
 

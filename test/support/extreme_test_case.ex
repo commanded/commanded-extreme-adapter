@@ -23,6 +23,9 @@ defmodule Commanded.ExtremeTestCase do
             password: "changeit",
             reconnect_delay: 2_000,
             max_attempts: :infinity
+          ],
+          spear: [
+            connection_string: "esdb://localhost:2113"
           ]
         ],
         config

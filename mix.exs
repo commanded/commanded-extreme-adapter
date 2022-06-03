@@ -7,7 +7,7 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
     [
       app: :commanded_extreme_adapter,
       version: @version,
-      elixir: "~> 1.6",
+      elixir: "~> 1.13",
       elixirc_paths: elixirc_paths(Mix.env()),
       consolidate_protocols: Mix.env() != :test,
       description: description(),
@@ -37,9 +37,9 @@ defmodule Commanded.EventStore.Adapters.Extreme.Mixfile do
 
   defp deps do
     [
-      {:commanded, "~> 1.2"},
+      {:commanded, "~> 1.3"},
       {:extreme, "~> 0.13"},
-
+      {:spear, "~> 1.0"},
       # Optional dependencies
       {:jason, "~> 1.2", optional: true},
 
