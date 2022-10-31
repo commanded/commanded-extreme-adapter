@@ -143,6 +143,12 @@ defmodule Commanded.EventStore.Adapters.Extreme do
   end
 
   @impl Commanded.EventStore.Adapter
+  def ack_event(_adapter_meta, subscription, [%RecordedEvent{} | _rest] = events) do
+    %RecordedEvent{event_number: event_number} = List.last(events)
+    Subscription.ack(subscription, event_number)
+  end
+
+  @impl Commanded.EventStore.Adapter
   def ack_event(_adapter_meta, subscription, %RecordedEvent{event_number: event_number}) do
     Subscription.ack(subscription, event_number)
   end
